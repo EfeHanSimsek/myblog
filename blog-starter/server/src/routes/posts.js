@@ -14,8 +14,34 @@ function validatePost(payload) {
   return null;
 }
 
+function validateComment(payload) {
+  if (!payload.name?.trim()) return 'Ad zorunlu';
+  if (!payload.email?.trim()) return 'E-posta zorunlu';
+  if (!/^\S+@\S+\.\S+$/.test(String(payload.email))) return 'Geçerli bir e-posta gir';
+  if (!payload.content?.trim()) return 'Yorum zorunlu';
+  if (payload.content.trim().length < 3) return 'Yorum çok kısa';
+  if (payload.content.trim().length > 1000) return 'Yorum 1000 karakteri geçemez';
+  return null;
+}
+
+function normalizeDb(db) {
+  if (!Array.isArray(db.comments)) db.comments = [];
+  return db;
+}
+
+function publicComment(comment) {
+  return {
+    id: comment.id,
+    postId: comment.postId,
+    name: comment.name,
+    content: comment.content,
+    status: comment.status,
+    createdAt: comment.createdAt
+  };
+}
+
 router.get('/', async (req, res) => {
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const includeDrafts = req.query.includeDrafts === 'true';
   const search = String(req.query.search || '').toLowerCase();
   const category = String(req.query.category || '').toLowerCase();
@@ -30,38 +56,109 @@ router.get('/', async (req, res) => {
 
   posts = posts
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-    .map(publicPost);
+    .map((post) => ({
+      ...publicPost(post),
+      approvedComments: db.comments.filter((comment) => comment.postId === post.id && comment.status === 'approved').length
+    }));
 
   return ok(res, { posts });
 });
 
 router.get('/stats/summary', requireAuth, requirePublisher, async (req, res) => {
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const posts = db.posts;
+  const comments = db.comments;
   return ok(res, {
     totalPosts: posts.length,
     publishedPosts: posts.filter((post) => post.status === 'published').length,
     draftPosts: posts.filter((post) => post.status === 'draft').length,
-    totalViews: posts.reduce((sum, post) => sum + Number(post.views || 0), 0)
+    totalViews: posts.reduce((sum, post) => sum + Number(post.views || 0), 0),
+    totalComments: comments.length,
+    pendingComments: comments.filter((comment) => comment.status === 'pending').length,
+    approvedComments: comments.filter((comment) => comment.status === 'approved').length
   });
 });
 
+router.get('/comments/moderation', requireAuth, requirePublisher, async (req, res) => {
+  const db = normalizeDb(await readDb());
+  const comments = db.comments
+    .map((comment) => ({
+      ...comment,
+      postTitle: db.posts.find((post) => post.id === comment.postId)?.title || 'Silinmiş yazı'
+    }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return ok(res, { comments });
+});
+
 router.get('/:slug', async (req, res) => {
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const post = db.posts.find((item) => item.slug === req.params.slug && item.status === 'published');
   if (!post) return fail(res, 404, 'Yazı bulunamadı');
 
   post.views = Number(post.views || 0) + 1;
   await writeDb(db);
 
-  return ok(res, { post: publicPost(post) });
+  const comments = db.comments
+    .filter((comment) => comment.postId === post.id && comment.status === 'approved')
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .map(publicComment);
+
+  return ok(res, { post: { ...publicPost(post), comments } });
+});
+
+router.post('/:id/comments', async (req, res) => {
+  const error = validateComment(req.body || {});
+  if (error) return fail(res, 400, error);
+
+  const db = normalizeDb(await readDb());
+  const post = db.posts.find((item) => item.id === req.params.id && item.status === 'published');
+  if (!post) return fail(res, 404, 'Yazı bulunamadı');
+
+  const now = new Date().toISOString();
+  const comment = {
+    id: `c_${crypto.randomUUID()}`,
+    postId: post.id,
+    name: req.body.name.trim().slice(0, 80),
+    email: req.body.email.trim().toLowerCase().slice(0, 160),
+    content: req.body.content.trim(),
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  db.comments.push(comment);
+  await writeDb(db);
+  return ok(res, { comment: publicComment(comment) }, 'Yorum onaya gönderildi');
+});
+
+router.patch('/comments/:id/status', requireAuth, requirePublisher, async (req, res) => {
+  if (!['approved', 'pending', 'rejected'].includes(req.body?.status)) return fail(res, 400, 'Geçersiz yorum durumu');
+
+  const db = normalizeDb(await readDb());
+  const comment = db.comments.find((item) => item.id === req.params.id);
+  if (!comment) return fail(res, 404, 'Yorum bulunamadı');
+
+  comment.status = req.body.status;
+  comment.updatedAt = new Date().toISOString();
+  await writeDb(db);
+  return ok(res, { comment }, 'Yorum durumu güncellendi');
+});
+
+router.delete('/comments/:id', requireAuth, requirePublisher, async (req, res) => {
+  const db = normalizeDb(await readDb());
+  const before = db.comments.length;
+  db.comments = db.comments.filter((comment) => comment.id !== req.params.id);
+  if (db.comments.length === before) return fail(res, 404, 'Yorum bulunamadı');
+
+  await writeDb(db);
+  return ok(res, null, 'Yorum silindi');
 });
 
 router.post('/', requireAuth, requirePublisher, async (req, res) => {
   const error = validatePost(req.body || {});
   if (error) return fail(res, 400, error);
 
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const now = new Date().toISOString();
   const baseSlug = makeSlug(req.body.slug || req.body.title);
   const slugExists = db.posts.some((post) => post.slug === baseSlug);
@@ -92,7 +189,7 @@ router.put('/:id', requireAuth, requirePublisher, async (req, res) => {
   const error = validatePost(req.body || {});
   if (error) return fail(res, 400, error);
 
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const index = db.posts.findIndex((post) => post.id === req.params.id);
   if (index === -1) return fail(res, 404, 'Yazı bulunamadı');
 
@@ -118,10 +215,11 @@ router.put('/:id', requireAuth, requirePublisher, async (req, res) => {
 });
 
 router.delete('/:id', requireAuth, requirePublisher, async (req, res) => {
-  const db = await readDb();
+  const db = normalizeDb(await readDb());
   const before = db.posts.length;
   db.posts = db.posts.filter((post) => post.id !== req.params.id);
   if (db.posts.length === before) return fail(res, 404, 'Yazı bulunamadı');
+  db.comments = db.comments.filter((comment) => comment.postId !== req.params.id);
 
   await writeDb(db);
   return ok(res, null, 'Yazı silindi');

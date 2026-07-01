@@ -50,8 +50,8 @@ app.get('/sitemap.xml', async (req, res, next) => {
     const urls = [
       { loc: `${siteUrl}/`, lastmod: new Date().toISOString() },
       ...posts.map((post) => ({ loc: `${siteUrl}/posts/${post.slug}`, lastmod: post.updatedAt || post.createdAt })),
-      ...categories.map((category) => ({ loc: `${siteUrl}/?category=${makeSlug(category)}`, lastmod: new Date().toISOString() })),
-      ...tags.map((tag) => ({ loc: `${siteUrl}/?tag=${makeSlug(tag)}`, lastmod: new Date().toISOString() }))
+      ...categories.map((category) => ({ loc: `${siteUrl}/kategori/${makeSlug(category)}`, lastmod: new Date().toISOString() })),
+      ...tags.map((tag) => ({ loc: `${siteUrl}/etiket/${makeSlug(tag)}`, lastmod: new Date().toISOString() }))
     ];
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((url) => `  <url><loc>${escapeXml(url.loc)}</loc><lastmod>${escapeXml(url.lastmod)}</lastmod></url>`).join('\n')}\n</urlset>`;

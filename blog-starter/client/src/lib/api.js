@@ -7,10 +7,16 @@ export function getToken() {
 
 export function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token);
+  window.dispatchEvent(new Event('auth-change'));
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event('auth-change'));
+}
+
+export function isAuthenticated() {
+  return Boolean(getToken());
 }
 
 export async function api(path, options = {}) {
@@ -25,6 +31,11 @@ export async function api(path, options = {}) {
   });
 
   const payload = await response.json().catch(() => ({ success: false, message: 'Geçersiz API cevabı' }));
+
+  if (response.status === 401) {
+    clearToken();
+  }
+
   if (!response.ok || !payload.success) {
     throw new Error(payload.message || 'API hatası');
   }

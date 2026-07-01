@@ -87,6 +87,7 @@ main { flex: 1; }
 .stats strong { font-size: 2rem; }
 .stats span { color: var(--muted); }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.meta-help { display: flex; flex-wrap: wrap; gap: .75rem; color: var(--muted); font-size: .86rem; }
 .actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .actions button + button, .table-row button + button { background: #6b7280; }
 .table-list { display: grid; gap: .75rem; }

@@ -17,6 +17,20 @@ const emptyForm = {
   publishedAt: ''
 };
 
+const emptyMediaForm = {
+  id: null,
+  title: '',
+  url: '',
+  altText: '',
+  caption: '',
+  credit: '',
+  type: 'image',
+  tags: '',
+  width: '',
+  height: '',
+  sizeLabel: ''
+};
+
 function createSlug(value) {
   return value
     .toLocaleLowerCase('tr-TR')
@@ -33,28 +47,45 @@ function createSlug(value) {
     .slice(0, 80);
 }
 
+function toDatetimeLocal(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function Dashboard() {
   const [posts, setPosts] = useState([]);
   const [stats, setStats] = useState(null);
   const [comments, setComments] = useState([]);
+  const [media, setMedia] = useState([]);
+  const [mediaTypes, setMediaTypes] = useState(['image', 'video', 'document', 'audio', 'other']);
   const [commentFilter, setCommentFilter] = useState('pending');
   const [form, setForm] = useState(emptyForm);
+  const [mediaForm, setMediaForm] = useState(emptyMediaForm);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [mediaQuery, setMediaQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState('all');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
 
   async function load() {
-    const [postData, statData, commentData] = await Promise.all([
+    const [postData, statData, commentData, mediaData] = await Promise.all([
       api('/posts?includeDrafts=true'),
       api('/posts/stats/summary'),
-      api('/posts/comments/moderation')
+      api('/posts/comments/moderation'),
+      api('/media')
     ]);
     setPosts(postData.posts);
     setStats(statData);
     setComments(commentData.comments || []);
+    setMedia(mediaData.media || []);
+    setMediaTypes(mediaData.types || mediaTypes);
   }
 
   useEffect(() => { load().catch((err) => setError(err.message)); }, []);
@@ -79,25 +110,59 @@ export function Dashboard() {
     return comments.filter((comment) => commentFilter === 'all' || comment.status === commentFilter);
   }, [comments, commentFilter]);
 
+  const filteredMedia = useMemo(() => {
+    const searchValue = mediaQuery.trim().toLocaleLowerCase('tr-TR');
+    return media.filter((item) => {
+      const matchesType = mediaTypeFilter === 'all' || item.type === mediaTypeFilter;
+      const haystack = [item.title, item.altText, item.caption, item.credit, ...(item.tags || [])].join(' ').toLocaleLowerCase('tr-TR');
+      return matchesType && (!searchValue || haystack.includes(searchValue));
+    });
+  }, [media, mediaQuery, mediaTypeFilter]);
+
   function setField(name, value) {
     setForm((current) => {
-      if (name === 'title' && (!current.slug || current.slug === createSlug(current.title))) {
-        return { ...current, title: value, slug: createSlug(value), seoTitle: current.seoTitle || value };
+      if (name === 'title') {
+        const next = { ...current, title: value };
+        if (!current.slug || current.slug === createSlug(current.title)) next.slug = createSlug(value);
+        if (!current.seoTitle || current.seoTitle === current.title.slice(0, 70)) next.seoTitle = value.slice(0, 70);
+        if (!current.altCoverImage || current.altCoverImage === current.title) next.altCoverImage = value;
+        return next;
+      }
+      if (name === 'summary' && (!current.seoDescription || current.seoDescription === current.summary.slice(0, 160))) {
+        return { ...current, summary: value, seoDescription: value.slice(0, 160) };
       }
       return { ...current, [name]: value };
     });
   }
 
+  function setMediaField(name, value) {
+    setMediaForm((current) => {
+      if (name === 'title' && (!current.altText || current.altText === current.title)) return { ...current, title: value, altText: value };
+      return { ...current, [name]: value };
+    });
+  }
+
+  function useMediaAsCover(item) {
+    if (item.type !== 'image') return;
+    setForm((current) => ({ ...current, coverImage: item.url, altCoverImage: item.altText || item.title || current.altCoverImage }));
+    setMessage('Medya kapak görseli olarak seçildi.');
+  }
+
   function edit(post) {
     setForm({
+      ...emptyForm,
       ...post,
       seoTitle: post.seoTitle || '',
       seoDescription: post.seoDescription || '',
       altCoverImage: post.altCoverImage || '',
-      publishedAt: post.publishedAt ? post.publishedAt.slice(0, 16) : '',
+      publishedAt: toDatetimeLocal(post.publishedAt),
       tags: post.tags?.join(', ') || ''
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function editMedia(item) {
+    setMediaForm({ ...emptyMediaForm, ...item, tags: item.tags?.join(', ') || '' });
   }
 
   async function submit(event) {
@@ -130,11 +195,46 @@ export function Dashboard() {
     }
   }
 
+  async function submitMedia(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setIsSavingMedia(true);
+    const payload = { ...mediaForm, tags: mediaForm.tags.split(',').map((tag) => tag.trim()).filter(Boolean) };
+
+    try {
+      if (mediaForm.id) {
+        await api(`/media/${mediaForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        setMessage('Medya kaydı güncellendi.');
+      } else {
+        await api('/media', { method: 'POST', body: JSON.stringify(payload) });
+        setMessage('Medya kaydı oluşturuldu.');
+      }
+      setMediaForm(emptyMediaForm);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSavingMedia(false);
+    }
+  }
+
   async function remove(id) {
     if (!confirm('Bu yazı silinsin mi?')) return;
     try {
       await api(`/posts/${id}`, { method: 'DELETE' });
       setMessage('Yazı silindi.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function removeMedia(id) {
+    if (!confirm('Bu medya kaydı silinsin mi? Dosyanın kendisi silinmez, sadece kütüphane kaydı kaldırılır.')) return;
+    try {
+      await api(`/media/${id}`, { method: 'DELETE' });
+      setMessage('Medya kaydı silindi.');
       await load();
     } catch (err) {
       setError(err.message);
@@ -196,12 +296,13 @@ export function Dashboard() {
           <label>Kategori<input value={form.category} onChange={(e) => setField('category', e.target.value)} /></label>
           <label>Durum<select value={form.status} onChange={(e) => setField('status', e.target.value)}><option value="draft">Taslak</option><option value="published">Yayında</option></select></label>
         </div>
-        <label>SEO Başlığı<input value={form.seoTitle} onChange={(e) => setField('seoTitle', e.target.value)} maxLength="70" placeholder="Arama motorlarında görünecek başlık" /><span className="field-hint">{form.seoTitle.length}/70 karakter</span></label>
-        <label>SEO Açıklaması<textarea value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value)} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
+        <label>SEO Başlığı<input value={form.seoTitle} onChange={(e) => setField('seoTitle', e.target.value.slice(0, 70))} maxLength="70" placeholder="Arama motorlarında görünecek başlık" /><span className="field-hint">{form.seoTitle.length}/70 karakter</span></label>
+        <label>SEO Açıklaması<textarea value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
         <label>Yayın Tarihi<input type="datetime-local" value={form.publishedAt} onChange={(e) => setField('publishedAt', e.target.value)} /><span className="field-hint">Boş bırakılırsa yayın sırasında otomatik atanır.</span></label>
         <label>Özet<textarea value={form.summary} onChange={(e) => setField('summary', e.target.value)} rows="2" /></label>
         <label>Kapak görseli URL<input value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} /></label>
         <label>Kapak görseli alt metni<input value={form.altCoverImage} onChange={(e) => setField('altCoverImage', e.target.value)} placeholder="Görsel erişilebilirlik açıklaması" /></label>
+        {media.some((item) => item.type === 'image') && <div className="media-picker"><strong>Medya kütüphanesinden kapak seç</strong><div className="media-strip">{media.filter((item) => item.type === 'image').slice(0, 8).map((item) => <button type="button" className="media-thumb" key={item.id} onClick={() => useMediaAsCover(item)}><img src={item.url} alt={item.altText || item.title} /><span>{item.title}</span></button>)}</div></div>}
         <label>Etiketler<input value={form.tags} onChange={(e) => setField('tags', e.target.value)} placeholder="react, blog, cms" /></label>
         <label>İçerik<textarea value={form.content} onChange={(e) => setField('content', e.target.value)} rows="10" required /></label>
         {message && <p className="success">{message}</p>}
@@ -209,50 +310,39 @@ export function Dashboard() {
         <div className="actions"><button disabled={isSaving}>{isSaving ? 'Kaydediliyor...' : form.id ? 'Güncelle' : 'Oluştur'}</button><button type="button" onClick={() => setForm(emptyForm)}>Temizle</button></div>
       </form>
 
+      <div className="panel media-library">
+        <div className="section-heading"><div><p className="eyebrow">Medya Kütüphanesi</p><h2>Medya URL ve Metadata</h2></div><span className="result-count">{filteredMedia.length} / {media.length} medya</span></div>
+        <form className="media-form" onSubmit={submitMedia}>
+          <div className="form-grid"><label>Başlık<input value={mediaForm.title} onChange={(e) => setMediaField('title', e.target.value)} required /></label><label>Tip<select value={mediaForm.type} onChange={(e) => setMediaField('type', e.target.value)}>{mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label></div>
+          <label>Medya URL<input value={mediaForm.url} onChange={(e) => setMediaField('url', e.target.value)} placeholder="https://..." required /></label>
+          <div className="form-grid"><label>Alt metin<input value={mediaForm.altText} onChange={(e) => setMediaField('altText', e.target.value)} /></label><label>Kredi/Kaynak<input value={mediaForm.credit} onChange={(e) => setMediaField('credit', e.target.value)} /></label></div>
+          <label>Açıklama<textarea value={mediaForm.caption} onChange={(e) => setMediaField('caption', e.target.value)} rows="2" /></label>
+          <div className="form-grid"><label>Etiketler<input value={mediaForm.tags} onChange={(e) => setMediaField('tags', e.target.value)} placeholder="kapak, ürün, ekip" /></label><label>Boyut etiketi<input value={mediaForm.sizeLabel} onChange={(e) => setMediaField('sizeLabel', e.target.value)} placeholder="1200×800, 450 KB" /></label></div>
+          <div className="actions"><button disabled={isSavingMedia}>{isSavingMedia ? 'Kaydediliyor...' : mediaForm.id ? 'Medyayı Güncelle' : 'Medya Ekle'}</button><button type="button" onClick={() => setMediaForm(emptyMediaForm)}>Temizle</button></div>
+        </form>
+        <div className="toolbar"><label>Medya arama<input value={mediaQuery} onChange={(e) => setMediaQuery(e.target.value)} placeholder="Başlık, alt metin, kaynak, etiket ara" /></label><label>Tip<select value={mediaTypeFilter} onChange={(e) => setMediaTypeFilter(e.target.value)}><option value="all">Tüm tipler</option>{mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label></div>
+        <div className="media-grid">{filteredMedia.map((item) => <article className="media-card" key={item.id}>{item.type === 'image' ? <img src={item.url} alt={item.altText || item.title} /> : <div className="media-file">{item.type}</div>}<div><strong>{item.title}</strong><span>{item.type} · {item.credit || 'kaynak yok'}{item.sizeLabel ? ` · ${item.sizeLabel}` : ''}</span><p>{item.caption || item.altText || item.url}</p><div className="tag-row">{item.tags?.map((tag) => <span key={tag}>#{tag}</span>)}</div></div><div className="actions"><button type="button" onClick={() => useMediaAsCover(item)} disabled={item.type !== 'image'}>Kapak Yap</button><button type="button" onClick={() => editMedia(item)}>Düzenle</button><button type="button" onClick={() => removeMedia(item.id)}>Sil</button></div></article>)}{!filteredMedia.length && <p className="notice">Bu filtrelerle eşleşen medya yok.</p>}</div>
+      </div>
+
       <div className="panel">
         <div className="section-heading">
-          <div>
-            <p className="eyebrow">Arşiv</p>
-            <h2>Yazılar</h2>
-          </div>
+          <div><p className="eyebrow">Arşiv</p><h2>Yazılar</h2></div>
           <span className="result-count">{filteredPosts.length} / {posts.length} sonuç</span>
         </div>
-
         <div className="toolbar">
           <label>Arama<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Başlık, özet, etiket ara" /></label>
           <label>Durum<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">Tümü</option><option value="published">Yayında</option><option value="draft">Taslak</option></select></label>
           <label>Kategori<select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">Tüm kategoriler</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
         </div>
-
-        <div className="table-list">
-          {filteredPosts.map((post) => (
-            <div className="table-row" key={post.id}>
-              <div><strong>{post.title}</strong><span>{post.category} · {post.status} · {post.readingTime} dk · {post.views || 0} görüntülenme</span></div>
-              <div className="actions"><button onClick={() => edit(post)}>Düzenle</button><button onClick={() => remove(post.id)}>Sil</button></div>
-            </div>
-          ))}
-          {!filteredPosts.length && <p className="notice">Bu filtrelerle eşleşen yazı bulunamadı.</p>}
-        </div>
+        <div className="table-list">{filteredPosts.map((post) => <div className="table-row" key={post.id}><div><strong>{post.title}</strong><span>{post.category} · {post.status} · {post.readingTime} dk · {post.views || 0} görüntülenme</span></div><div className="actions"><button onClick={() => edit(post)}>Düzenle</button><button onClick={() => remove(post.id)}>Sil</button></div></div>)}{!filteredPosts.length && <p className="notice">Bu filtrelerle eşleşen yazı bulunamadı.</p>}</div>
       </div>
 
       <div className="panel">
         <div className="section-heading">
-          <div>
-            <p className="eyebrow">Moderasyon</p>
-            <h2>Yorumlar</h2>
-          </div>
+          <div><p className="eyebrow">Moderasyon</p><h2>Yorumlar</h2></div>
           <select className="compact-filter" value={commentFilter} onChange={(e) => setCommentFilter(e.target.value)}><option value="pending">Bekleyen</option><option value="approved">Onaylı</option><option value="rejected">Reddedilen</option><option value="all">Tümü</option></select>
         </div>
-        <div className="comment-list moderation-list">
-          {filteredComments.map((comment) => (
-            <article className="comment-card" key={comment.id}>
-              <div><strong>{comment.name}</strong><span>{comment.postTitle} · {comment.status} · {new Date(comment.createdAt).toLocaleDateString('tr-TR')}</span></div>
-              <p>{comment.content}</p>
-              <div className="actions"><button onClick={() => updateCommentStatus(comment.id, 'approved')}>Onayla</button><button onClick={() => updateCommentStatus(comment.id, 'pending')}>Beklet</button><button onClick={() => updateCommentStatus(comment.id, 'rejected')}>Reddet</button><button onClick={() => deleteComment(comment.id)}>Sil</button></div>
-            </article>
-          ))}
-          {!filteredComments.length && <p className="notice">Bu durumda yorum yok.</p>}
-        </div>
+        <div className="comment-list moderation-list">{filteredComments.map((comment) => <article className="comment-card" key={comment.id}><div><strong>{comment.name}</strong><span>{comment.postTitle} · {comment.status} · {new Date(comment.createdAt).toLocaleDateString('tr-TR')}</span></div><p>{comment.content}</p><div className="actions"><button onClick={() => updateCommentStatus(comment.id, 'approved')}>Onayla</button><button onClick={() => updateCommentStatus(comment.id, 'pending')}>Beklet</button><button onClick={() => updateCommentStatus(comment.id, 'rejected')}>Reddet</button><button onClick={() => deleteComment(comment.id)}>Sil</button></div></article>)}{!filteredComments.length && <p className="notice">Bu durumda yorum yok.</p>}</div>
       </div>
     </section>
   );

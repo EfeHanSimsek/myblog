@@ -17,14 +17,34 @@
       "summary": "Bu yazı sıfırdan geliştirilen blog sisteminin örnek içeriğidir.",
       "content": "# İlk Blog Yazısı\n\nBu proje custom backend ile çalışan modern bir blog altyapısı olarak başlatıldı.\n\n## Neler Var?\n\n- Yayımcı girişi\n- Blog CRUD\n- Taslak ve yayın yönetimi\n- SEO alanları\n- Responsive arayüz",
       "coverImage": "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1200&auto=format&fit=crop",
+      "altCoverImage": "Dizüstü bilgisayarda blog yazan kişi",
       "category": "Genel",
       "tags": ["blog", "başlangıç", "cms"],
       "status": "published",
+      "publishedAt": "2026-07-01T00:00:00.000Z",
       "views": 0,
       "authorId": "u_1",
       "createdAt": "2026-07-01T00:00:00.000Z",
       "updatedAt": "2026-07-01T00:00:00.000Z"
     }
   ],
-  "comments": []
+  "comments": [],
+  "media": [
+    {
+      "id": "m_1",
+      "title": "Blog çalışma alanı",
+      "url": "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1200&auto=format&fit=crop",
+      "altText": "Dizüstü bilgisayarda blog yazan kişi",
+      "caption": "Örnek kapak görseli",
+      "credit": "Unsplash",
+      "type": "image",
+      "tags": ["blog", "çalışma", "kapak"],
+      "width": 1200,
+      "height": "",
+      "sizeLabel": "",
+      "createdBy": "u_1",
+      "createdAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-01T00:00:00.000Z"
+    }
+  ]
 }

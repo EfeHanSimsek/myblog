@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import { readDb, writeDb } from '../utils/storage.js';
 import { ok, fail } from '../utils/apiResponse.js';
-import { makeSlug, publicPost } from '../utils/postHelpers.js';
+import { makeSlug, publicPost, isPublicPost } from '../utils/postHelpers.js';
 import { requireAuth, requirePublisher } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,6 +11,7 @@ function validatePost(payload) {
   if (!payload.title?.trim()) return 'Başlık zorunlu';
   if (!payload.content?.trim()) return 'İçerik zorunlu';
   if (!['draft', 'published'].includes(payload.status)) return 'Geçersiz yayın durumu';
+  if (payload.publishedAt && Number.isNaN(new Date(payload.publishedAt).getTime())) return 'Geçersiz yayın tarihi';
   return null;
 }
 
@@ -40,8 +41,27 @@ function publicComment(comment) {
   };
 }
 
+function normalizePostPayload(payload, fallback = {}) {
+  return {
+    title: payload.title.trim(),
+    slug: makeSlug(payload.slug || payload.title),
+    summary: payload.summary?.trim() || '',
+    seoTitle: payload.seoTitle?.trim().slice(0, 70) || payload.title.trim().slice(0, 70),
+    seoDescription: payload.seoDescription?.trim().slice(0, 170) || payload.summary?.trim().slice(0, 170) || '',
+    content: payload.content.trim(),
+    coverImage: payload.coverImage?.trim() || '',
+    altCoverImage: payload.altCoverImage?.trim() || payload.title.trim(),
+    category: payload.category?.trim() || 'Genel',
+    tags: Array.isArray(payload.tags) ? payload.tags.map(String).map((tag) => tag.trim()).filter(Boolean) : [],
+    status: payload.status,
+    publishedAt: payload.status === 'published'
+      ? (payload.publishedAt ? new Date(payload.publishedAt).toISOString() : fallback.publishedAt || new Date().toISOString())
+      : (payload.publishedAt ? new Date(payload.publishedAt).toISOString() : '')
+  };
+}
+
 function publishedPosts(db) {
-  return db.posts.filter((post) => post.status === 'published');
+  return db.posts.filter((post) => isPublicPost(post));
 }
 
 function decoratePost(post, db) {
@@ -62,9 +82,9 @@ router.get('/', async (req, res) => {
   const tag = String(req.query.tag || '').toLowerCase();
   const tagSlug = String(req.query.tagSlug || '').toLowerCase();
 
-  let posts = db.posts.filter((post) => includeDrafts || post.status === 'published');
+  let posts = db.posts.filter((post) => includeDrafts || isPublicPost(post));
   if (search) {
-    posts = posts.filter((post) => `${post.title} ${post.summary} ${post.content}`.toLowerCase().includes(search));
+    posts = posts.filter((post) => `${post.title} ${post.summary} ${post.seoTitle || ''} ${post.seoDescription || ''} ${post.content}`.toLowerCase().includes(search));
   }
   if (category) {
     posts = posts.filter((post) => post.category.toLowerCase() === category);
@@ -80,7 +100,7 @@ router.get('/', async (req, res) => {
   }
 
   posts = posts
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .sort((a, b) => new Date(b.publishedAt || b.updatedAt || b.createdAt) - new Date(a.publishedAt || a.updatedAt || a.createdAt))
     .map((post) => decoratePost(post, db));
 
   return ok(res, { posts });
@@ -119,7 +139,8 @@ router.get('/stats/summary', requireAuth, requirePublisher, async (req, res) => 
   const comments = db.comments;
   return ok(res, {
     totalPosts: posts.length,
-    publishedPosts: posts.filter((post) => post.status === 'published').length,
+    publishedPosts: posts.filter((post) => isPublicPost(post)).length,
+    scheduledPosts: posts.filter((post) => post.status === 'published' && post.publishedAt && new Date(post.publishedAt) > new Date()).length,
     draftPosts: posts.filter((post) => post.status === 'draft').length,
     totalViews: posts.reduce((sum, post) => sum + Number(post.views || 0), 0),
     totalComments: comments.length,
@@ -141,7 +162,7 @@ router.get('/comments/moderation', requireAuth, requirePublisher, async (req, re
 
 router.get('/:slug', async (req, res) => {
   const db = normalizeDb(await readDb());
-  const post = db.posts.find((item) => item.slug === req.params.slug && item.status === 'published');
+  const post = db.posts.find((item) => item.slug === req.params.slug && isPublicPost(item));
   if (!post) return fail(res, 404, 'Yazı bulunamadı');
 
   post.views = Number(post.views || 0) + 1;
@@ -160,7 +181,7 @@ router.post('/:id/comments', async (req, res) => {
   if (error) return fail(res, 400, error);
 
   const db = normalizeDb(await readDb());
-  const post = db.posts.find((item) => item.id === req.params.id && item.status === 'published');
+  const post = db.posts.find((item) => item.id === req.params.id && isPublicPost(item));
   if (!post) return fail(res, 404, 'Yazı bulunamadı');
 
   const now = new Date().toISOString();
@@ -209,21 +230,15 @@ router.post('/', requireAuth, requirePublisher, async (req, res) => {
 
   const db = normalizeDb(await readDb());
   const now = new Date().toISOString();
-  const baseSlug = makeSlug(req.body.slug || req.body.title);
+  const normalized = normalizePostPayload(req.body);
+  const baseSlug = normalized.slug;
   const slugExists = db.posts.some((post) => post.slug === baseSlug);
   const slug = slugExists ? `${baseSlug}-${crypto.randomBytes(3).toString('hex')}` : baseSlug;
 
   const post = {
     id: `p_${crypto.randomUUID()}`,
-    title: req.body.title.trim(),
+    ...normalized,
     slug,
-    summary: req.body.summary?.trim() || '',
-    content: req.body.content.trim(),
-    coverImage: req.body.coverImage?.trim() || '',
-    altCoverImage: req.body.altCoverImage?.trim() || '',
-    category: req.body.category?.trim() || 'Genel',
-    tags: Array.isArray(req.body.tags) ? req.body.tags.map(String).filter(Boolean) : [],
-    status: req.body.status,
     views: 0,
     authorId: req.user.id,
     createdAt: now,
@@ -243,21 +258,13 @@ router.put('/:id', requireAuth, requirePublisher, async (req, res) => {
   const index = db.posts.findIndex((post) => post.id === req.params.id);
   if (index === -1) return fail(res, 404, 'Yazı bulunamadı');
 
-  const nextSlug = makeSlug(req.body.slug || req.body.title);
-  const duplicate = db.posts.some((post) => post.id !== req.params.id && post.slug === nextSlug);
+  const normalized = normalizePostPayload(req.body, db.posts[index]);
+  const duplicate = db.posts.some((post) => post.id !== req.params.id && post.slug === normalized.slug);
   if (duplicate) return fail(res, 409, 'Bu slug başka bir yazıda kullanılıyor');
 
   db.posts[index] = {
     ...db.posts[index],
-    title: req.body.title.trim(),
-    slug: nextSlug,
-    summary: req.body.summary?.trim() || '',
-    content: req.body.content.trim(),
-    coverImage: req.body.coverImage?.trim() || '',
-    altCoverImage: req.body.altCoverImage?.trim() || '',
-    category: req.body.category?.trim() || 'Genel',
-    tags: Array.isArray(req.body.tags) ? req.body.tags.map(String).filter(Boolean) : [],
-    status: req.body.status,
+    ...normalized,
     updatedAt: new Date().toISOString()
   };
 

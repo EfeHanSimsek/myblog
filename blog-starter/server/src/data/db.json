@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": "u_1",
+      "name": "Admin",
+      "email": "admin@blog.local",
+      "passwordHash": "$2a$10$E22S65cvjL4GQRAiqmjreuY2eT3YwHuBWAp60pZUYmIAYImWTjnzm",
+      "role": "admin",
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    }
+  ],
+  "posts": [
+    {
+      "id": "p_1",
+      "title": "İlk Blog Yazısı",
+      "slug": "ilk-blog-yazisi",
+      "summary": "Bu yazı sıfırdan geliştirilen blog sisteminin örnek içeriğidir.",
+      "content": "# İlk Blog Yazısı\n\nBu proje custom backend ile çalışan modern bir blog altyapısı olarak başlatıldı.\n\n## Neler Var?\n\n- Yayımcı girişi\n- Blog CRUD\n- Taslak ve yayın yönetimi\n- SEO alanları\n- Responsive arayüz",
+      "coverImage": "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1200&auto=format&fit=crop",
+      "category": "Genel",
+      "tags": ["blog", "başlangıç", "cms"],
+      "status": "published",
+      "views": 0,
+      "authorId": "u_1",
+      "createdAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+}

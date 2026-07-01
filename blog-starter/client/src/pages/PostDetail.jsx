@@ -36,6 +36,24 @@ function readingProgress() {
   return Math.min(100, Math.max(0, Math.round((window.scrollY / height) * 100)));
 }
 
+function articleSchema(post, shareUrl) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.seoTitle || post.title,
+    description: post.seoDescription || post.summary || post.contentSummary,
+    image: post.coverImage ? [post.coverImage] : undefined,
+    datePublished: post.publishedAt || post.createdAt,
+    dateModified: post.updatedAt,
+    mainEntityOfPage: shareUrl,
+    articleSection: post.category,
+    keywords: (post.tags || []).join(', '),
+    wordCount: post.wordCount,
+    author: { '@type': 'Organization', name: 'NovaBlog' },
+    publisher: { '@type': 'Organization', name: 'NovaBlog' }
+  };
+}
+
 export function PostDetail() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
@@ -68,6 +86,7 @@ export function PostDetail() {
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
   const toc = useMemo(() => post?.tableOfContents || [], [post]);
+  const schema = useMemo(() => post ? JSON.stringify(articleSchema(post, shareUrl)) : '', [post, shareUrl]);
 
   async function copyLink() {
     await navigator.clipboard.writeText(shareUrl);
@@ -96,7 +115,9 @@ export function PostDetail() {
 
   return (
     <article className="page article">
+      <script type="application/ld+json">{schema}</script>
       <div className="reading-progress" style={{ width: `${progress}%` }} />
+      <nav className="breadcrumb" aria-label="Sayfa yolu"><Link to="/">Blog</Link><span>/</span>{post.categorySlug ? <Link to={`/kategori/${post.categorySlug}`}>{post.category}</Link> : <span>{post.category}</span>}<span>/</span><strong>{post.title}</strong></nav>
       <Link to="/">← Tüm yazılar</Link>
       <div className="meta-row"><span>{post.category}</span><span>{post.readingTime} dk okuma</span><span>{post.wordCount || 0} kelime</span><span>{post.views} görüntülenme</span><span>{post.comments?.length || 0} yorum</span></div>
       <h1>{post.title}</h1>
@@ -112,7 +133,10 @@ export function PostDetail() {
       )}
 
       <div className="content">{renderMarkdownLite(post.content)}</div>
-      <div className="tag-row">{post.tags?.map((tag) => <span key={tag}>#{tag}</span>)}</div>
+      <div className="tag-row">{post.tags?.map((tag, index) => {
+        const tagSlug = post.tagSlugs?.[index];
+        return tagSlug ? <Link key={tag} to={`/etiket/${tagSlug}`}>#{tag}</Link> : <span key={tag}>#{tag}</span>;
+      })}</div>
 
       <section className="panel share-box" aria-label="Paylaşım seçenekleri">
         <h2>Paylaş</h2>

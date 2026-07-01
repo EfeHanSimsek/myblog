@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { PostCard } from '../components/PostCard';
@@ -39,29 +39,22 @@ export function FilteredPosts({ type }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [slug, copy.param]);
+  }, [copy.param, slug]);
 
-  const activeFacet = useMemo(() => {
-    const list = type === 'tag' ? facets.tags : facets.categories;
-    return list.find((item) => item.slug === slug);
+  const currentName = useMemo(() => {
+    const source = type === 'tag' ? facets.tags : facets.categories;
+    return source.find((item) => item.slug === slug)?.name || slug;
   }, [facets, slug, type]);
-
-  useEffect(() => {
-    const label = activeFacet?.name || slug;
-    document.title = `${copy.title}: ${label} | NovaBlog`;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', `${label} ${copy.title.toLocaleLowerCase('tr-TR')} sayfasındaki güncel blog yazıları.`);
-  }, [activeFacet, copy.title, slug]);
-
-  const title = activeFacet?.name || slug;
 
   return (
     <section className="page stack">
-      <nav className="breadcrumb" aria-label="Sayfa yolu"><Link to="/">Blog</Link><span>/</span><span>{copy.title}</span><span>/</span><strong>{title}</strong></nav>
+      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/">Ana sayfa</Link><span>/</span><span>{copy.title}</span><span>/</span><span>{currentName}</span></nav>
       <div className="hero compact-hero">
         <p className="eyebrow">{copy.title}</p>
-        <h1>{title}</h1>
+        <h1>{currentName}</h1>
         <p>{posts.length} yayınlanmış yazı listeleniyor.</p>
       </div>
+
       {loading && <p className="notice">Yazılar yükleniyor...</p>}
       {error && <p className="error">{error}</p>}
       {!loading && !posts.length && <p className="notice">{copy.empty}</p>}

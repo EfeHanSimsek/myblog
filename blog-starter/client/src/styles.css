@@ -17,6 +17,9 @@ button { border: 0; background: var(--accent); color: white; padding: 0.75rem 1r
 button:disabled { opacity: .6; cursor: not-allowed; }
 input, textarea, select { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: .85rem 1rem; background: white; }
 label { display: grid; gap: .4rem; font-weight: 650; color: #2b2b2b; }
+:focus-visible { outline: 3px solid #7c3aed; outline-offset: 3px; }
+.skip-link { position: fixed; left: 1rem; top: 1rem; z-index: 100; transform: translateY(-150%); background: var(--accent); color: white; padding: .75rem 1rem; border-radius: 999px; transition: transform .2s ease; }
+.skip-link:focus { transform: translateY(0); }
 
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .site-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 1rem clamp(1rem, 4vw, 4rem); background: rgba(247,247,242,.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }

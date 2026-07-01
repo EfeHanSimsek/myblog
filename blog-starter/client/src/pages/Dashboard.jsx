@@ -31,6 +31,7 @@ function createSlug(value) {
 
 export function Dashboard() {
   const [posts, setPosts] = useState([]);
+  const [comments, setComments] = useState([]);
   const [stats, setStats] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState('');
@@ -38,15 +39,18 @@ export function Dashboard() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [commentFilter, setCommentFilter] = useState('pending');
   const [isSaving, setIsSaving] = useState(false);
 
   async function load() {
-    const [postData, statData] = await Promise.all([
+    const [postData, statData, commentData] = await Promise.all([
       api('/posts?includeDrafts=true'),
-      api('/posts/stats/summary')
+      api('/posts/stats/summary'),
+      api('/posts/comments/moderation')
     ]);
     setPosts(postData.posts);
     setStats(statData);
+    setComments(commentData.comments);
   }
 
   useEffect(() => { load().catch((err) => setError(err.message)); }, []);
@@ -66,6 +70,10 @@ export function Dashboard() {
       return matchesStatus && matchesCategory && matchesQuery;
     });
   }, [posts, query, statusFilter, categoryFilter]);
+
+  const filteredComments = useMemo(() => {
+    return comments.filter((comment) => commentFilter === 'all' || comment.status === commentFilter);
+  }, [comments, commentFilter]);
 
   function setField(name, value) {
     setForm((current) => {
@@ -121,6 +129,27 @@ export function Dashboard() {
     }
   }
 
+  async function updateCommentStatus(id, status) {
+    try {
+      await api(`/posts/comments/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage('Yorum durumu güncellendi.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function removeComment(id) {
+    if (!confirm('Bu yorum silinsin mi?')) return;
+    try {
+      await api(`/posts/comments/${id}`, { method: 'DELETE' });
+      setMessage('Yorum silindi.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <section className="page dashboard stack">
       <div>
@@ -134,6 +163,9 @@ export function Dashboard() {
           <div><strong>{stats.publishedPosts}</strong><span>Yayında</span></div>
           <div><strong>{stats.draftPosts}</strong><span>Taslak</span></div>
           <div><strong>{stats.totalViews}</strong><span>Görüntülenme</span></div>
+          <div><strong>{stats.totalComments}</strong><span>Toplam yorum</span></div>
+          <div><strong>{stats.pendingComments}</strong><span>Onay bekleyen</span></div>
+          <div><strong>{stats.approvedComments}</strong><span>Onaylı yorum</span></div>
         </div>
       )}
 
@@ -155,10 +187,36 @@ export function Dashboard() {
         <label>Kapak görseli URL<input value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} /></label>
         <label>Etiketler<input value={form.tags} onChange={(e) => setField('tags', e.target.value)} placeholder="react, blog, cms" /></label>
         <label>İçerik<textarea value={form.content} onChange={(e) => setField('content', e.target.value)} rows="10" required /></label>
-        {message && <p className="success">{message}</p>}
-        {error && <p className="error">{error}</p>}
+        {message && <p className="success" role="status">{message}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="actions"><button disabled={isSaving}>{isSaving ? 'Kaydediliyor...' : form.id ? 'Güncelle' : 'Oluştur'}</button><button type="button" onClick={() => setForm(emptyForm)}>Temizle</button></div>
       </form>
+
+      <div className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Yorum Moderasyonu</p>
+            <h2>Yorumlar</h2>
+          </div>
+          <span className="result-count">{filteredComments.length} / {comments.length} yorum</span>
+        </div>
+        <label className="compact-filter">Durum<select value={commentFilter} onChange={(e) => setCommentFilter(e.target.value)}><option value="pending">Onay bekleyen</option><option value="approved">Onaylı</option><option value="rejected">Reddedilen</option><option value="all">Tümü</option></select></label>
+        <div className="comment-list moderation-list">
+          {filteredComments.map((comment) => (
+            <article className="comment-card" key={comment.id}>
+              <div><strong>{comment.name}</strong><span>{comment.postTitle} · {comment.status} · {new Date(comment.createdAt).toLocaleString('tr-TR')}</span></div>
+              <p>{comment.content}</p>
+              <div className="actions">
+                <button onClick={() => updateCommentStatus(comment.id, 'approved')}>Onayla</button>
+                <button onClick={() => updateCommentStatus(comment.id, 'pending')}>Beklet</button>
+                <button onClick={() => updateCommentStatus(comment.id, 'rejected')}>Reddet</button>
+                <button onClick={() => removeComment(comment.id)}>Sil</button>
+              </div>
+            </article>
+          ))}
+          {!filteredComments.length && <p className="notice">Bu filtrede yorum yok.</p>}
+        </div>
+      </div>
 
       <div className="panel">
         <div className="section-heading">
@@ -178,7 +236,7 @@ export function Dashboard() {
         <div className="table-list">
           {filteredPosts.map((post) => (
             <div className="table-row" key={post.id}>
-              <div><strong>{post.title}</strong><span>{post.category} · {post.status} · {post.readingTime} dk · {post.views || 0} görüntülenme</span></div>
+              <div><strong>{post.title}</strong><span>{post.category} · {post.status} · {post.readingTime} dk · {post.views || 0} görüntülenme · {post.approvedComments || 0} yorum</span></div>
               <div className="actions"><button onClick={() => edit(post)}>Düzenle</button><button onClick={() => remove(post.id)}>Sil</button></div>
             </div>
           ))}

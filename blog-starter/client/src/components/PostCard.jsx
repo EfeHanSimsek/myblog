@@ -6,14 +6,17 @@ export function PostCard({ post }) {
       {post.coverImage && <img src={post.coverImage} alt={post.altCoverImage || post.title} loading="lazy" />}
       <div className="post-card-body">
         <div className="meta-row">
-          <span>{post.category}</span>
+          {post.categorySlug ? <Link to={`/kategori/${post.categorySlug}`}>{post.category}</Link> : <span>{post.category}</span>}
           <span>{post.readingTime} dk okuma</span>
           <span>{post.wordCount || 0} kelime</span>
           <span>{post.approvedComments || post.comments?.length || 0} yorum</span>
         </div>
         <h2><Link to={`/posts/${post.slug}`}>{post.title}</Link></h2>
         <p>{post.contentSummary || post.summary}</p>
-        <div className="tag-row">{post.tags?.map((tag) => <span key={tag}>#{tag}</span>)}</div>
+        <div className="tag-row">{post.tags?.map((tag, index) => {
+          const tagSlug = post.tagSlugs?.[index];
+          return tagSlug ? <Link key={tag} to={`/etiket/${tagSlug}`}>#{tag}</Link> : <span key={tag}>#{tag}</span>;
+        })}</div>
       </div>
     </article>
   );

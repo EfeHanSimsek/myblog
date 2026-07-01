@@ -13,6 +13,10 @@ import { makeSlug, publicPost, isPublicPost } from './utils/postHelpers.js';
 const app = express();
 const port = Number(process.env.PORT || 4000);
 const siteUrl = (process.env.SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 function escapeXml(value = '') {
   return String(value)
@@ -30,7 +34,12 @@ function publishedPosts(db) {
 }
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS origin engellendi: ${origin}`));
+  }
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 

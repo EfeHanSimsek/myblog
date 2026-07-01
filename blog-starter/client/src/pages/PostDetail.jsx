@@ -1,16 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 
 const emptyComment = { name: '', email: '', content: '' };
 
+function slugify(value) {
+  return value
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function renderMarkdownLite(content) {
   return content.split('\n').map((line, index) => {
-    if (line.startsWith('# ')) return <h1 key={index}>{line.slice(2)}</h1>;
-    if (line.startsWith('## ')) return <h2 key={index}>{line.slice(3)}</h2>;
+    if (line.startsWith('# ')) return <h1 key={index} id={slugify(line.slice(2))}>{line.slice(2)}</h1>;
+    if (line.startsWith('## ')) return <h2 key={index} id={slugify(line.slice(3))}>{line.slice(3)}</h2>;
+    if (line.startsWith('### ')) return <h3 key={index} id={slugify(line.slice(4))}>{line.slice(4)}</h3>;
+    if (line.startsWith('- ')) return <p className="list-line" key={index}>• {line.slice(2)}</p>;
     if (!line.trim()) return <br key={index} />;
     return <p key={index}>{line}</p>;
   });
+}
+
+function readingProgress() {
+  const height = document.documentElement.scrollHeight - window.innerHeight;
+  if (height <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((window.scrollY / height) * 100)));
 }
 
 export function PostDetail() {
@@ -21,16 +44,35 @@ export function PostDetail() {
   const [commentMessage, setCommentMessage] = useState('');
   const [commentError, setCommentError] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    function onScroll() {
+      setProgress(readingProgress());
+    }
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     api(`/posts/${slug}`)
       .then((data) => {
         setPost(data.post);
-        document.title = `${data.post.title} | NovaBlog`;
-        document.querySelector('meta[name="description"]')?.setAttribute('content', data.post.summary || data.post.title);
+        document.title = `${data.post.seoTitle || data.post.title} | NovaBlog`;
+        document.querySelector('meta[name="description"]')?.setAttribute('content', data.post.seoDescription || data.post.summary || data.post.title);
       })
       .catch((err) => setError(err.message));
   }, [slug]);
+
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const toc = useMemo(() => post?.tableOfContents || [], [post]);
+
+  async function copyLink() {
+    await navigator.clipboard.writeText(shareUrl);
+    setCommentMessage('Yazı bağlantısı kopyalandı.');
+  }
 
   async function submitComment(event) {
     event.preventDefault();
@@ -54,13 +96,33 @@ export function PostDetail() {
 
   return (
     <article className="page article">
+      <div className="reading-progress" style={{ width: `${progress}%` }} />
       <Link to="/">← Tüm yazılar</Link>
-      <div className="meta-row"><span>{post.category}</span><span>{post.readingTime} dk okuma</span><span>{post.views} görüntülenme</span><span>{post.comments?.length || 0} yorum</span></div>
+      <div className="meta-row"><span>{post.category}</span><span>{post.readingTime} dk okuma</span><span>{post.wordCount || 0} kelime</span><span>{post.views} görüntülenme</span><span>{post.comments?.length || 0} yorum</span></div>
       <h1>{post.title}</h1>
       <p className="lead">{post.summary}</p>
-      {post.coverImage && <img className="cover" src={post.coverImage} alt={post.title} />}
+      <div className="meta-row"><span>Yayın: {new Date(post.publishedAt || post.createdAt).toLocaleDateString('tr-TR')}</span><span>Güncelleme: {new Date(post.updatedAt).toLocaleDateString('tr-TR')}</span></div>
+      {post.coverImage && <img className="cover" src={post.coverImage} alt={post.altCoverImage || post.title} loading="lazy" />}
+
+      {!!toc.length && (
+        <nav className="toc panel" aria-label="İçindekiler">
+          <strong>İçindekiler</strong>
+          {toc.map((item) => <a key={item.id} className={`toc-level-${item.level}`} href={`#${item.id}`}>{item.title}</a>)}
+        </nav>
+      )}
+
       <div className="content">{renderMarkdownLite(post.content)}</div>
       <div className="tag-row">{post.tags?.map((tag) => <span key={tag}>#{tag}</span>)}</div>
+
+      <section className="panel share-box" aria-label="Paylaşım seçenekleri">
+        <h2>Paylaş</h2>
+        <div className="actions">
+          <a className="button-link" href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(post.title)}`} target="_blank" rel="noreferrer">X/Twitter</a>
+          <a className="button-link" href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer">LinkedIn</a>
+          <a className="button-link" href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${post.title} ${shareUrl}`)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+          <button type="button" onClick={copyLink}>Linki Kopyala</button>
+        </div>
+      </section>
 
       <section className="comments" aria-labelledby="comments-title">
         <h2 id="comments-title">Yorumlar</h2>

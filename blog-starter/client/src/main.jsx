@@ -6,6 +6,8 @@ import { Home } from './pages/Home';
 import { PostDetail } from './pages/PostDetail';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { FilteredPosts } from './pages/FilteredPosts';
+import { NotFound } from './pages/NotFound';
 import './styles.css';
 
 const router = createBrowserRouter([
@@ -15,8 +17,11 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'posts/:slug', element: <PostDetail /> },
+      { path: 'kategori/:slug', element: <FilteredPosts type="category" /> },
+      { path: 'etiket/:slug', element: <FilteredPosts type="tag" /> },
       { path: 'login', element: <Login /> },
-      { path: 'dashboard', element: <Dashboard /> }
+      { path: 'dashboard', element: <Dashboard /> },
+      { path: '*', element: <NotFound /> }
     ]
   }
 ]);

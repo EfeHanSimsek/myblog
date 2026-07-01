@@ -7,7 +7,7 @@ import authRoutes from './routes/auth.js';
 import postRoutes from './routes/posts.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { readDb } from './utils/storage.js';
-import { makeSlug, publicPost } from './utils/postHelpers.js';
+import { makeSlug, publicPost, isPublicPost } from './utils/postHelpers.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -24,8 +24,8 @@ function escapeXml(value = '') {
 
 function publishedPosts(db) {
   return db.posts
-    .filter((post) => post.status === 'published')
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    .filter((post) => isPublicPost(post))
+    .sort((a, b) => new Date(b.publishedAt || b.updatedAt || b.createdAt) - new Date(a.publishedAt || a.updatedAt || a.createdAt));
 }
 
 app.use(helmet());
@@ -49,7 +49,7 @@ app.get('/sitemap.xml', async (req, res, next) => {
     const tags = [...new Set(posts.flatMap((post) => post.tags || []))];
     const urls = [
       { loc: `${siteUrl}/`, lastmod: new Date().toISOString() },
-      ...posts.map((post) => ({ loc: `${siteUrl}/posts/${post.slug}`, lastmod: post.updatedAt || post.createdAt })),
+      ...posts.map((post) => ({ loc: `${siteUrl}/posts/${post.slug}`, lastmod: post.updatedAt || post.publishedAt || post.createdAt })),
       ...categories.map((category) => ({ loc: `${siteUrl}/kategori/${makeSlug(category)}`, lastmod: new Date().toISOString() })),
       ...tags.map((tag) => ({ loc: `${siteUrl}/etiket/${makeSlug(tag)}`, lastmod: new Date().toISOString() }))
     ];
@@ -67,11 +67,11 @@ app.get('/rss.xml', async (req, res, next) => {
     const posts = publishedPosts(db).slice(0, 30).map(publicPost);
     const items = posts.map((post) => `
       <item>
-        <title>${escapeXml(post.title)}</title>
+        <title>${escapeXml(post.seoTitle || post.title)}</title>
         <link>${escapeXml(`${siteUrl}/posts/${post.slug}`)}</link>
         <guid>${escapeXml(`${siteUrl}/posts/${post.slug}`)}</guid>
-        <pubDate>${new Date(post.createdAt).toUTCString()}</pubDate>
-        <description>${escapeXml(post.contentSummary || post.summary)}</description>
+        <pubDate>${new Date(post.publishedAt || post.createdAt).toUTCString()}</pubDate>
+        <description>${escapeXml(post.seoDescription || post.contentSummary || post.summary)}</description>
       </item>`).join('');
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>

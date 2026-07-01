@@ -55,6 +55,18 @@ function toDatetimeLocal(value) {
   return local.toISOString().slice(0, 16);
 }
 
+function downloadJson(filename, value) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function Dashboard() {
   const [posts, setPosts] = useState([]);
   const [stats, setStats] = useState(null);
@@ -73,6 +85,7 @@ export function Dashboard() {
   const [mediaTypeFilter, setMediaTypeFilter] = useState('all');
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingMedia, setIsSavingMedia] = useState(false);
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   async function load() {
     const [postData, statData, commentData, mediaData] = await Promise.all([
@@ -163,6 +176,24 @@ export function Dashboard() {
 
   function editMedia(item) {
     setMediaForm({ ...emptyMediaForm, ...item, tags: item.tags?.join(', ') || '' });
+  }
+
+  async function exportBackup() {
+    setError('');
+    setMessage('');
+    setIsExportingBackup(true);
+
+    try {
+      const data = await api('/backup/export');
+      const backup = data.backup || data;
+      const exportedDate = backup.exportedAt ? backup.exportedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      downloadJson(`novablog-backup-${exportedDate}.json`, backup);
+      setMessage('Yedek dosyası indirildi.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsExportingBackup(false);
+    }
   }
 
   async function submit(event) {
@@ -281,6 +312,19 @@ export function Dashboard() {
           <div><strong>{stats.approvedComments || 0}</strong><span>Onaylı yorum</span></div>
         </div>
       )}
+
+      <div className="panel backup-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Yedekleme</p>
+            <h2>Veri Yedeği</h2>
+          </div>
+          <button type="button" onClick={exportBackup} disabled={isExportingBackup}>
+            {isExportingBackup ? 'Hazırlanıyor...' : 'JSON Yedeği İndir'}
+          </button>
+        </div>
+        <p className="notice">Yazılar, kullanıcılar, yorumlar, medya kayıtları ve ayarlar tek bir JSON dosyası olarak dışa aktarılır.</p>
+      </div>
 
       <form className="panel editor" onSubmit={submit}>
         <div className="section-heading">

@@ -40,11 +40,27 @@ function publicComment(comment) {
   };
 }
 
+function publishedPosts(db) {
+  return db.posts.filter((post) => post.status === 'published');
+}
+
+function decoratePost(post, db) {
+  return {
+    ...publicPost(post),
+    categorySlug: makeSlug(post.category || 'Genel'),
+    tagSlugs: (post.tags || []).map((tag) => makeSlug(tag)),
+    approvedComments: db.comments.filter((comment) => comment.postId === post.id && comment.status === 'approved').length
+  };
+}
+
 router.get('/', async (req, res) => {
   const db = normalizeDb(await readDb());
   const includeDrafts = req.query.includeDrafts === 'true';
   const search = String(req.query.search || '').toLowerCase();
   const category = String(req.query.category || '').toLowerCase();
+  const categorySlug = String(req.query.categorySlug || '').toLowerCase();
+  const tag = String(req.query.tag || '').toLowerCase();
+  const tagSlug = String(req.query.tagSlug || '').toLowerCase();
 
   let posts = db.posts.filter((post) => includeDrafts || post.status === 'published');
   if (search) {
@@ -53,15 +69,48 @@ router.get('/', async (req, res) => {
   if (category) {
     posts = posts.filter((post) => post.category.toLowerCase() === category);
   }
+  if (categorySlug) {
+    posts = posts.filter((post) => makeSlug(post.category || 'Genel') === categorySlug);
+  }
+  if (tag) {
+    posts = posts.filter((post) => (post.tags || []).some((item) => item.toLowerCase() === tag));
+  }
+  if (tagSlug) {
+    posts = posts.filter((post) => (post.tags || []).some((item) => makeSlug(item) === tagSlug));
+  }
 
   posts = posts
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-    .map((post) => ({
-      ...publicPost(post),
-      approvedComments: db.comments.filter((comment) => comment.postId === post.id && comment.status === 'approved').length
-    }));
+    .map((post) => decoratePost(post, db));
 
   return ok(res, { posts });
+});
+
+router.get('/facets/public', async (req, res) => {
+  const db = normalizeDb(await readDb());
+  const posts = publishedPosts(db);
+  const categories = [...new Map(posts
+    .map((post) => post.category || 'Genel')
+    .filter(Boolean)
+    .map((category) => [makeSlug(category), { name: category, slug: makeSlug(category), count: 0 }]))
+    .values()];
+  const tags = [...new Map(posts
+    .flatMap((post) => post.tags || [])
+    .filter(Boolean)
+    .map((tagName) => [makeSlug(tagName), { name: tagName, slug: makeSlug(tagName), count: 0 }]))
+    .values()];
+
+  categories.forEach((category) => {
+    category.count = posts.filter((post) => makeSlug(post.category || 'Genel') === category.slug).length;
+  });
+  tags.forEach((tagItem) => {
+    tagItem.count = posts.filter((post) => (post.tags || []).some((postTag) => makeSlug(postTag) === tagItem.slug)).length;
+  });
+
+  return ok(res, {
+    categories: categories.sort((a, b) => a.name.localeCompare(b.name, 'tr')),
+    tags: tags.sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+  });
 });
 
 router.get('/stats/summary', requireAuth, requirePublisher, async (req, res) => {
@@ -103,7 +152,7 @@ router.get('/:slug', async (req, res) => {
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     .map(publicComment);
 
-  return ok(res, { post: { ...publicPost(post), comments } });
+  return ok(res, { post: { ...decoratePost(post, db), comments } });
 });
 
 router.post('/:id/comments', async (req, res) => {
@@ -171,6 +220,7 @@ router.post('/', requireAuth, requirePublisher, async (req, res) => {
     summary: req.body.summary?.trim() || '',
     content: req.body.content.trim(),
     coverImage: req.body.coverImage?.trim() || '',
+    altCoverImage: req.body.altCoverImage?.trim() || '',
     category: req.body.category?.trim() || 'Genel',
     tags: Array.isArray(req.body.tags) ? req.body.tags.map(String).filter(Boolean) : [],
     status: req.body.status,
@@ -204,6 +254,7 @@ router.put('/:id', requireAuth, requirePublisher, async (req, res) => {
     summary: req.body.summary?.trim() || '',
     content: req.body.content.trim(),
     coverImage: req.body.coverImage?.trim() || '',
+    altCoverImage: req.body.altCoverImage?.trim() || '',
     category: req.body.category?.trim() || 'Genel',
     tags: Array.isArray(req.body.tags) ? req.body.tags.map(String).filter(Boolean) : [],
     status: req.body.status,

@@ -6,6 +6,7 @@ import { Home } from './pages/Home';
 import { PostDetail } from './pages/PostDetail';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { AdminOps } from './pages/AdminOps';
 import { FilteredPosts } from './pages/FilteredPosts';
 import { NotFound } from './pages/NotFound';
 import { isAuthenticated } from './lib/api';
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: 'etiket/:slug', element: <FilteredPosts type="tag" /> },
       { path: 'login', element: <Login /> },
       { path: 'dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
+      { path: 'dashboard/system', element: <ProtectedRoute><AdminOps /></ProtectedRoute> },
       { path: '*', element: <NotFound /> }
     ]
   }

@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import authRoutes from './routes/auth.js';
 import postRoutes from './routes/posts.js';
 import mediaRoutes from './routes/media.js';
+import backupRoutes from './routes/backup.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { readDb } from './utils/storage.js';
 import { makeSlug, publicPost, isPublicPost } from './utils/postHelpers.js';
@@ -102,6 +103,7 @@ app.get('/rss.xml', async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/backup', backupRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

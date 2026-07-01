@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { PostDetail } from './pages/PostDetail';
@@ -8,7 +8,18 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { FilteredPosts } from './pages/FilteredPosts';
 import { NotFound } from './pages/NotFound';
+import { isAuthenticated } from './lib/api';
 import './styles.css';
+
+function ProtectedRoute({ children }) {
+  const location = useLocation();
+
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return children;
+}
 
 const router = createBrowserRouter([
   {
@@ -20,7 +31,7 @@ const router = createBrowserRouter([
       { path: 'kategori/:slug', element: <FilteredPosts type="category" /> },
       { path: 'etiket/:slug', element: <FilteredPosts type="tag" /> },
       { path: 'login', element: <Login /> },
-      { path: 'dashboard', element: <Dashboard /> },
+      { path: 'dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
       { path: '*', element: <NotFound /> }
     ]
   }

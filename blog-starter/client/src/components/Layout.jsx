@@ -32,6 +32,7 @@ export function Layout() {
         <nav aria-label="Ana menü">
           <NavLink to="/">Blog</NavLink>
           {isLoggedIn && <NavLink to="/dashboard">Panel</NavLink>}
+          {isLoggedIn && <NavLink to="/dashboard/system">Sistem</NavLink>}
           {!isLoggedIn ? <NavLink to="/login">Giriş</NavLink> : <button onClick={logout}>Çıkış</button>}
         </nav>
       </header>

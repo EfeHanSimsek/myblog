@@ -1,5 +1,5 @@
 .batch-seo-page .stats {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .batch-seo-control-panel {
@@ -16,6 +16,71 @@
 
 .batch-seo-toolbar label {
   min-width: 220px;
+}
+
+.batch-report-panel,
+.batch-history-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.compact-heading {
+  margin-bottom: 0;
+}
+
+.batch-report-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.batch-report-grid div {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  padding: 0.85rem;
+}
+
+.batch-report-grid strong,
+.batch-report-grid span {
+  display: block;
+}
+
+.batch-report-grid strong {
+  color: #111827;
+  font-size: 1.35rem;
+}
+
+.batch-report-grid span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin-top: 0.2rem;
+}
+
+.batch-log-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.batch-log-row {
+  align-items: start;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+}
+
+.batch-log-row strong,
+.batch-log-row span {
+  display: block;
+}
+
+.batch-log-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .batch-seo-grid {
@@ -131,6 +196,7 @@
 
 @media (max-width: 900px) {
   .batch-seo-page .stats,
+  .batch-report-grid,
   .batch-seo-card-head,
   .batch-seo-columns {
     grid-template-columns: 1fr;

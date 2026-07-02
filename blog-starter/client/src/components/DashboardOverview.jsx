@@ -53,7 +53,7 @@ function getOverview(posts) {
   };
 }
 
-export function DashboardOverview({ posts }) {
+export function DashboardOverview({ posts, onNewPost, onNewMedia, onExportBackup, isExportingBackup }) {
   const overview = getOverview(posts || []);
 
   return (
@@ -90,6 +90,23 @@ export function DashboardOverview({ posts }) {
         ) : (
           <p className="notice">Henüz zamanlanmış yayın yok.</p>
         )}
+      </article>
+
+      <article className="panel overview-card quick-actions-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Hızlı Aksiyonlar</p><h2>Admin kısayolları</h2></div>
+          <a className="row-action" href="/dashboard/system">Sistem</a>
+        </div>
+        <div className="quick-actions-grid">
+          <button type="button" onClick={onNewPost}>Yeni yazı</button>
+          <button type="button" onClick={onNewMedia}>Medya ekle</button>
+          <button type="button" onClick={onExportBackup} disabled={isExportingBackup}>
+            {isExportingBackup ? 'Yedek hazırlanıyor...' : 'Yedek indir'}
+          </button>
+          <a className="button-link" href="/dashboard/quality">Kalite kontrol</a>
+          <a className="button-link" href="/dashboard/calendar">Takvim</a>
+        </div>
+        <p className="notice">Sık kullanılan işlemler tek kartta toplandı; yeni yazı ve medya aksiyonları sayfa yenilemeden editör alanına odaklanır.</p>
       </article>
     </div>
   );

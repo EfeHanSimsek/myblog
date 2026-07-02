@@ -1,0 +1,142 @@
+.batch-seo-page .stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.batch-seo-control-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.batch-seo-toolbar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.batch-seo-toolbar label {
+  min-width: 220px;
+}
+
+.batch-seo-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.batch-seo-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.batch-seo-critical {
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.batch-seo-warning {
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.batch-seo-card-head {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto 1fr auto;
+}
+
+.batch-seo-card-head strong,
+.batch-seo-card-head span {
+  display: block;
+}
+
+.batch-seo-card-head span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-top: 0.25rem;
+}
+
+.batch-select-label {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.batch-select-label input {
+  accent-color: #111827;
+  width: auto;
+}
+
+.batch-select-label span {
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.batch-seo-columns {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.batch-seo-columns h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.65rem;
+}
+
+.batch-seo-columns .seo-state-pill {
+  margin: 0 0.35rem 0.35rem 0;
+}
+
+.seo-state-pill.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #92400e;
+}
+
+.seo-state-pill.neutral {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.batch-preview-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.batch-preview-list div {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+}
+
+.batch-preview-list dt {
+  color: #111827;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.batch-preview-list dd {
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .batch-seo-page .stats,
+  .batch-seo-card-head,
+  .batch-seo-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .batch-seo-card-head .row-action {
+    justify-self: start;
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import './AdminCalendar.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -65,6 +66,47 @@ function buildWeeks(anchorDate) {
   });
 }
 
+function getPlanningWarnings(posts) {
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+  const scheduled = posts.filter((post) => post.status === 'published' && parseDate(post.publishedAt) > now);
+  const drafts = posts.filter((post) => post.status === 'draft');
+  const urgentDrafts = drafts.filter((post) => {
+    const date = parseDate(post.publishedAt);
+    return date && date < nextWeek;
+  });
+  const soonPosts = scheduled.filter((post) => parseDate(post.publishedAt) < tomorrow);
+
+  const warnings = [];
+
+  if (soonPosts.length) {
+    warnings.push({
+      level: 'critical',
+      title: '24 saat içinde yayınlanacak içerik var',
+      text: `${soonPosts.length} yazı çok yakın tarihli. Kapak görseli, özet ve SEO alanlarını son kez kontrol edin.`
+    });
+  }
+
+  if (urgentDrafts.length) {
+    warnings.push({
+      level: 'warning',
+      title: 'Yakın tarihli taslaklar var',
+      text: `${urgentDrafts.length} taslak gelecek 7 gün içinde planlanmış görünüyor. Yayına alınmayacaksa tarihini temizleyin veya ileri taşıyın.`
+    });
+  }
+
+  if (!scheduled.length) {
+    warnings.push({
+      level: 'notice',
+      title: 'Zamanlanmış yayın kuyruğu boş',
+      text: 'Düzenli yayın akışı için en az 2-3 ileri tarihli içerik planlanması önerilir.'
+    });
+  }
+
+  return warnings;
+}
+
 export function AdminCalendar() {
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState('');
@@ -89,6 +131,7 @@ export function AdminCalendar() {
   const today = useMemo(() => startOfToday(), []);
   const todayKey = useMemo(() => toLocalDateKey(today), [today]);
   const calendarDays = useMemo(() => buildWeeks(anchor), [anchor]);
+  const planningWarnings = useMemo(() => getPlanningWarnings(posts), [posts]);
 
   const postsByDate = useMemo(() => {
     return posts.reduce((acc, post) => {
@@ -136,6 +179,25 @@ export function AdminCalendar() {
         <div><strong>{scheduledPosts.length}</strong><span>Zamanlandı</span></div>
         <div><strong>{draftPosts.length}</strong><span>Taslak</span></div>
         <div><strong>{posts.filter((post) => getPublishState(post, today).key === 'today').length}</strong><span>Bugün yayında</span></div>
+      </div>
+
+      <div className="panel planning-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Yayın Planlama</p>
+            <h2>Planlama uyarıları</h2>
+          </div>
+          <Link className="button-link" to="/dashboard/quality">Kalite kontrolüne git</Link>
+        </div>
+        <div className="planning-warnings">
+          {planningWarnings.map((warning) => (
+            <article className={`planning-warning planning-${warning.level}`} key={warning.title}>
+              <strong>{warning.title}</strong>
+              <p>{warning.text}</p>
+            </article>
+          ))}
+          {!planningWarnings.length && <p className="success">Yayın takvimi dengeli görünüyor.</p>}
+        </div>
       </div>
 
       <div className="panel calendar-panel">

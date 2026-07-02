@@ -66,6 +66,10 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function splitTags(value) {
+  return value.split(',').map((tag) => tag.trim()).filter(Boolean);
+}
+
 function getPlanningWarning(form) {
   if (!form.publishedAt) {
     if (form.status === 'published') {
@@ -133,12 +137,13 @@ function getEditorSeoChecklist(form) {
   const seoTitleLength = form.seoTitle.trim().length;
   const seoDescriptionLength = form.seoDescription.trim().length;
   const wordCount = form.content.trim().split(/\s+/).filter(Boolean).length;
-  const tagCount = form.tags.split(',').map((tag) => tag.trim()).filter(Boolean).length;
+  const tagCount = splitTags(form.tags).length;
 
   return [
     {
       key: 'title',
       field: 'title',
+      severity: 'critical',
       ok: titleLength >= 20 && titleLength <= 80,
       label: 'Başlık uzunluğu',
       detail: `${titleLength} karakter — ideal aralık 20-80.`
@@ -146,6 +151,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'slug',
       field: 'slug',
+      severity: 'critical',
       ok: slugLength > 0 && slugLength <= 80,
       label: 'SEO slug',
       detail: slugLength ? `${slugLength} karakterlik slug hazır.` : 'Slug boşsa başlıktan otomatik üretilecek.'
@@ -153,6 +159,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'summary',
       field: 'summary',
+      severity: 'critical',
       ok: summaryLength >= 60,
       label: 'Yazı özeti',
       detail: `${summaryLength} karakter — listeleme ve paylaşım için en az 60 önerilir.`
@@ -160,6 +167,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'seo-title',
       field: 'seoTitle',
+      severity: 'critical',
       ok: seoTitleLength >= 30 && seoTitleLength <= 70,
       label: 'SEO başlığı',
       detail: `${seoTitleLength}/70 karakter — ideal aralık 30-70.`
@@ -167,6 +175,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'seo-description',
       field: 'seoDescription',
+      severity: 'critical',
       ok: seoDescriptionLength >= 90 && seoDescriptionLength <= 160,
       label: 'SEO açıklaması',
       detail: `${seoDescriptionLength}/160 karakter — ideal aralık 90-160.`
@@ -174,6 +183,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'cover-alt',
       field: 'altCoverImage',
+      severity: 'warning',
       ok: !form.coverImage || form.altCoverImage.trim().length >= 8,
       label: 'Kapak alt metni',
       detail: form.coverImage ? 'Kapak görseli varsa açıklayıcı alt metin gerekli.' : 'Kapak görseli eklenirse alt metin de doldur.'
@@ -181,6 +191,7 @@ function getEditorSeoChecklist(form) {
     {
       key: 'tags',
       field: 'tags',
+      severity: 'warning',
       ok: tagCount >= 2,
       label: 'Etiket sayısı',
       detail: `${tagCount} etiket — keşif için en az 2 etiket önerilir.`
@@ -188,11 +199,54 @@ function getEditorSeoChecklist(form) {
     {
       key: 'content',
       field: 'content',
+      severity: 'critical',
       ok: wordCount >= 300,
       label: 'İçerik uzunluğu',
       detail: `${wordCount} kelime — kalıcı blog yazıları için en az 300 önerilir.`
     }
   ];
+}
+
+function getPublishGate(form, checklist, planningWarning) {
+  const missing = checklist.filter((item) => !item.ok);
+  const criticalMissing = missing.filter((item) => item.severity === 'critical');
+  const score = Math.round(((checklist.length - missing.length) / checklist.length) * 100);
+  const blocks = [];
+  const warnings = [];
+
+  if (form.status === 'published' && criticalMissing.length) {
+    blocks.push(`${criticalMissing.length} kritik SEO alanı eksik.`);
+  }
+
+  if (form.status === 'published' && score < 75) {
+    blocks.push(`Yayın kalite skoru ${score}%; yayın için en az 75% gerekli.`);
+  }
+
+  if (planningWarning?.type === 'critical') {
+    blocks.push(planningWarning.text);
+  }
+
+  if (form.status === 'draft' && missing.length) {
+    warnings.push(`Taslak kaydedilebilir; yayına almadan önce ${missing.length} SEO kontrolü tamamlanmalı.`);
+  }
+
+  if (form.status === 'published' && !blocks.length && missing.length) {
+    warnings.push(`${missing.length} uyarı kaldı; yayın engellenmez ama düzeltmen önerilir.`);
+  }
+
+  if (form.status === 'published' && !blocks.length && !missing.length) {
+    warnings.push('Yayına hazır: tüm temel SEO ve kalite kontrolleri tamamlandı.');
+  }
+
+  return {
+    score,
+    missing,
+    criticalMissing,
+    canSave: form.status !== 'published' || blocks.length === 0,
+    blocks,
+    warnings,
+    firstMissingField: criticalMissing[0]?.field || missing[0]?.field || null
+  };
 }
 
 function cleanExcerpt(value, limit) {
@@ -211,7 +265,7 @@ function getSeoSuggestions(form) {
   const contentExcerpt = cleanExcerpt(form.content, 170);
   const summaryBase = form.summary.trim() || contentExcerpt || (title ? `${title} hakkında kısa, anlaşılır ve güncel bir blog özeti.` : 'Bu yazı için kısa, anlaşılır ve güncel bir blog özeti.');
   const seoDescriptionBase = form.seoDescription.trim() || summaryBase;
-  const currentTags = form.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+  const currentTags = splitTags(form.tags);
   const suggestedTags = [category, ...title.split(/\s+/).filter((word) => word.length > 4).slice(0, 3)]
     .map((tag) => tag.replace(/[,.!?;:]/g, '').trim())
     .filter(Boolean);
@@ -328,6 +382,7 @@ export function Dashboard() {
   const editorSeoChecklist = useMemo(() => getEditorSeoChecklist(form), [form]);
   const editorSeoReadyCount = editorSeoChecklist.filter((item) => item.ok).length;
   const editorSeoMissing = editorSeoChecklist.filter((item) => !item.ok);
+  const publishGate = useMemo(() => getPublishGate(form, editorSeoChecklist, planningWarning), [form, editorSeoChecklist, planningWarning]);
 
   function setField(name, value) {
     setForm((current) => {
@@ -416,22 +471,29 @@ export function Dashboard() {
       return;
     }
 
+    if (!publishGate.canSave) {
+      setSeoRepairMode(true);
+      setError(`Yayın engellendi: ${publishGate.blocks.join(' ')}`);
+      window.setTimeout(() => focusSeoField(publishGate.firstMissingField), 80);
+      return;
+    }
+
     setIsSaving(true);
 
     const payload = {
       ...form,
       slug: form.slug || createSlug(form.title),
       publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : '',
-      tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+      tags: splitTags(form.tags)
     };
 
     try {
       if (form.id) {
         await api(`/posts/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        setMessage('Yazı güncellendi.');
+        setMessage(form.status === 'published' ? 'Yazı yayın güvenliği kontrolünden geçti ve güncellendi.' : 'Taslak güncellendi. Yayına almadan önce kalan uyarıları tamamla.');
       } else {
         await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
-        setMessage('Yazı oluşturuldu.');
+        setMessage(form.status === 'published' ? 'Yazı yayın güvenliği kontrolünden geçti ve oluşturuldu.' : 'Taslak oluşturuldu. Yayına almadan önce kalan uyarıları tamamla.');
       }
       setForm(emptyForm);
       setSeoRepairMode(false);
@@ -448,7 +510,7 @@ export function Dashboard() {
     setError('');
     setMessage('');
     setIsSavingMedia(true);
-    const payload = { ...mediaForm, tags: mediaForm.tags.split(',').map((tag) => tag.trim()).filter(Boolean) };
+    const payload = { ...mediaForm, tags: splitTags(mediaForm.tags) };
 
     try {
       if (mediaForm.id) {
@@ -569,6 +631,11 @@ export function Dashboard() {
         <label>SEO Açıklaması<textarea data-seo-field="seoDescription" value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
         <label>Yayın Tarihi<input type="datetime-local" value={form.publishedAt} onChange={(e) => setField('publishedAt', e.target.value)} /><span className="field-hint">Boş bırakılırsa yayın sırasında otomatik atanır.</span></label>
         {planningWarning && <div className={`planning-hint planning-${planningWarning.type}`}><strong>{planningWarning.title}</strong><span>{planningWarning.text}</span></div>}
+        <div className={`planning-hint ${publishGate.canSave ? 'planning-notice' : 'planning-critical'}`}>
+          <strong>{publishGate.canSave ? 'Kayıt güvenliği' : 'Yayın engeli aktif'}</strong>
+          <span>{form.status === 'published' ? (publishGate.canSave ? `Yayın kalite skoru ${publishGate.score}%. Kayıt yapılabilir.` : publishGate.blocks.join(' ')) : `Taslak kalite skoru ${publishGate.score}%. Taslak kayıt engellenmez.`}</span>
+          {publishGate.warnings.map((warning) => <span key={warning}>{warning}</span>)}
+        </div>
         <div className="seo-checklist">
           <div className="section-heading">
             <div>
@@ -576,14 +643,14 @@ export function Dashboard() {
               <h3>{editorSeoReadyCount} / {editorSeoChecklist.length} kontrol hazır</h3>
             </div>
             <div className="actions compact-actions">
-              <span className="quality-score">{Math.round((editorSeoReadyCount / editorSeoChecklist.length) * 100)}%</span>
+              <span className="quality-score">{publishGate.score}%</span>
               <button className="mini-action" type="button" onClick={applySeoSuggestions} disabled={!editorSeoMissing.length}>Eksikleri öneriyle doldur</button>
             </div>
           </div>
           <div className="seo-checklist-grid">
             {editorSeoChecklist.map((item) => (
               <div className={`seo-check-item ${item.ok ? 'seo-check-ok' : 'seo-check-missing'}`} key={item.key}>
-                <strong>{item.ok ? 'Hazır' : 'Eksik'} · {item.label}</strong>
+                <strong>{item.ok ? 'Hazır' : item.severity === 'critical' ? 'Kritik eksik' : 'Uyarı'} · {item.label}</strong>
                 <span>{item.detail}</span>
                 {!item.ok && <button className="mini-action" type="button" onClick={() => focusSeoField(item.field)}>Alana git</button>}
               </div>

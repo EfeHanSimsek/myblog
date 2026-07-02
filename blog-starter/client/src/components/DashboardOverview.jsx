@@ -53,6 +53,39 @@ function getOverview(posts) {
   };
 }
 
+const quickActions = [
+  {
+    href: '/dashboard#editor',
+    label: 'Yeni yazı',
+    detail: 'Editör formuna git'
+  },
+  {
+    href: '/dashboard#media-library',
+    label: 'Medya ekle',
+    detail: 'Medya kütüphanesine git'
+  },
+  {
+    href: '/dashboard#backup',
+    label: 'Yedek indir',
+    detail: 'JSON yedek alanına git'
+  },
+  {
+    href: '/dashboard/quality',
+    label: 'Kalite kontrol',
+    detail: 'Yayın hazırlığını denetle'
+  },
+  {
+    href: '/dashboard/calendar',
+    label: 'Takvim',
+    detail: 'Yayın planını gör'
+  },
+  {
+    href: '/dashboard/system',
+    label: 'Sistem',
+    detail: 'Sağlık ve import alanı'
+  }
+];
+
 export function DashboardOverview({ posts }) {
   const overview = getOverview(posts || []);
 
@@ -98,13 +131,14 @@ export function DashboardOverview({ posts }) {
           <a className="row-action" href="/dashboard/system">Sistem</a>
         </div>
         <div className="quick-actions-grid">
-          <a className="button-link" href="/dashboard">Yeni yazı</a>
-          <a className="button-link" href="/dashboard">Medya ekle</a>
-          <a className="button-link" href="/dashboard/system">Yedek işlemleri</a>
-          <a className="button-link" href="/dashboard/quality">Kalite kontrol</a>
-          <a className="button-link" href="/dashboard/calendar">Takvim</a>
+          {quickActions.map((action) => (
+            <a className="button-link quick-action-link" href={action.href} key={action.href}>
+              <strong>{action.label}</strong>
+              <span>{action.detail}</span>
+            </a>
+          ))}
         </div>
-        <p className="notice">Sık kullanılan işlemler tek kartta toplandı; dış servis veya ek hesap gerektirmeyen admin geçişleri hızlı erişime alındı.</p>
+        <p className="notice">Kısayollar artık doğrudan ilgili admin alanına yönlenir; yerel testte form state'ini değiştirmeden güvenli anchor geçişi sağlar.</p>
       </article>
     </div>
   );

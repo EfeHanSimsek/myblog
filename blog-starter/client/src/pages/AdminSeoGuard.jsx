@@ -156,7 +156,10 @@ export function AdminSeoGuard() {
           <p className="eyebrow">SEO Onarım</p>
           <h1>Kayıt öncesi kritik kontrol</h1>
         </div>
-        <Link className="row-action" to="/dashboard/quality">Kalite paneli</Link>
+        <div className="actions compact-actions">
+          <Link className="row-action" to="/dashboard/batch-seo-repair">Toplu SEO</Link>
+          <Link className="row-action" to="/dashboard/quality">Kalite paneli</Link>
+        </div>
       </div>
 
       <div className="stats">
@@ -176,6 +179,7 @@ export function AdminSeoGuard() {
         <p>
           Bu panel yazıları kaydetmeden veya yayına almadan önce kritik SEO eksiklerini görünür yapar. Dış servis, ödeme, CDN veya mail hesabı gerektirmez; mevcut custom backend verisini okur.
         </p>
+        <p className="notice">Birden fazla yazıda aynı metadata eksiği varsa Toplu SEO sayfasından güvenli önerileri seçili yazılara batch uygulayabilirsin.</p>
         {topPriority && topPriority.status !== 'ready' && (
           <div className={`seo-priority-callout seo-priority-${topPriority.status}`}>
             <strong>İlk müdahale: {topPriority.post.title || 'Başlıksız yazı'}</strong>

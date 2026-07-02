@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 
 const emptyForm = {
@@ -137,6 +138,7 @@ function downloadJson(filename, value) {
 }
 
 export function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
   const [stats, setStats] = useState(null);
   const [comments, setComments] = useState([]);
@@ -171,6 +173,22 @@ export function Dashboard() {
   }
 
   useEffect(() => { load().catch((err) => setError(err.message)); }, []);
+
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || !posts.length) return;
+
+    const targetPost = posts.find((post) => String(post.id) === editId);
+    if (!targetPost) {
+      setError('Takvimden seçilen yazı bulunamadı.');
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    edit(targetPost);
+    setMessage('Takvimden seçilen yazı editöre yüklendi.');
+    setSearchParams({}, { replace: true });
+  }, [posts, searchParams, setSearchParams]);
 
   const categories = useMemo(() => {
     return [...new Set(posts.map((post) => post.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));

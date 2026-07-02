@@ -34,6 +34,7 @@ export function Layout() {
           {isLoggedIn && <NavLink to="/dashboard">Panel</NavLink>}
           {isLoggedIn && <NavLink to="/dashboard/calendar">Takvim</NavLink>}
           {isLoggedIn && <NavLink to="/dashboard/quality">Kalite</NavLink>}
+          {isLoggedIn && <NavLink to="/dashboard/seo-guard">SEO Onarım</NavLink>}
           {isLoggedIn && <NavLink to="/dashboard/system">Sistem</NavLink>}
           {!isLoggedIn ? <NavLink to="/login">Giriş</NavLink> : <button onClick={logout}>Çıkış</button>}
         </nav>

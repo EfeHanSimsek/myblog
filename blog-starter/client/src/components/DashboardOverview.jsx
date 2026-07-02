@@ -78,6 +78,7 @@ function getOverview(posts) {
     .sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
   const dueSoon = scheduled.filter((post) => new Date(post.publishedAt).getTime() - now <= sevenDays);
   const datedDrafts = posts.filter((post) => post.status === 'draft' && post.publishedAt);
+  const unscheduledDrafts = posts.filter((post) => post.status === 'draft' && !post.publishedAt);
   const safety = posts.map(getPublishSafety);
   const riskyPosts = safety
     .filter((item) => item.qualityIssues.length)
@@ -85,16 +86,27 @@ function getOverview(posts) {
   const publishedBlockers = safety.filter((item) => item.isPublished && item.criticalSeoIssues.length);
   const publishReadyDrafts = safety.filter((item) => item.post.status === 'draft' && item.isReady);
   const criticalDrafts = safety.filter((item) => item.post.status === 'draft' && item.criticalSeoIssues.length);
+  const needsContent = safety.filter((item) => item.qualityIssues.includes('İçerik kısa'));
+  const missingMediaMeta = safety.filter((item) => item.qualityIssues.includes('Kapak görseli eksik') || item.qualityIssues.includes('Kapak alt metni eksik'));
+  const seoQueue = safety
+    .filter((item) => item.criticalSeoIssues.length || item.qualityIssues.some((issue) => issue.startsWith('SEO')))
+    .sort((a, b) => b.criticalSeoIssues.length - a.criticalSeoIssues.length || a.score - b.score);
+  const averageScore = safety.length ? Math.round(safety.reduce((total, item) => total + item.score, 0) / safety.length) : 100;
 
   return {
     scheduled,
     dueSoon,
     datedDrafts,
+    unscheduledDrafts,
     riskyPosts,
     readyPosts: safety.filter((item) => item.isReady).length,
     publishedBlockers,
     publishReadyDrafts,
     criticalDrafts,
+    needsContent,
+    missingMediaMeta,
+    seoQueue,
+    averageScore,
     nextPost: scheduled[0] || null,
     topRisk: riskyPosts[0] || null,
     safety
@@ -150,6 +162,13 @@ const publishingChecklist = [
   'Yayınlamadan önce kalite panelinde kritik uyarı kalmadı mı?'
 ];
 
+const safetyWorkflow = [
+  'Önce yayındaki kritik SEO kayıtlarını kapat.',
+  'Sonra hazır taslakları takvim tarihine göre sırala.',
+  'Eksik medya ve kısa içerik kuyruğunu toplu düzelt.',
+  'Yayına almadan önce son kez SEO Onarım filtresini kontrol et.'
+];
+
 function scrollToDashboardSection(event, selector) {
   if (!selector || window.location.pathname !== '/dashboard') return;
 
@@ -160,8 +179,13 @@ function scrollToDashboardSection(event, selector) {
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function getEditorHref(post) {
+  return `/dashboard?edit=${post.id}&focus=seo`;
+}
+
 export function DashboardOverview({ posts }) {
   const overview = getOverview(posts || []);
+  const topSeoQueue = overview.seoQueue.slice(0, 3);
 
   return (
     <div className="overview-grid">
@@ -173,7 +197,7 @@ export function DashboardOverview({ posts }) {
         <div className="quality-summary">
           <div><strong>{overview.readyPosts}</strong><span>Sorunsuz yazı</span></div>
           <div><strong>{overview.riskyPosts.length}</strong><span>Kontrol isteyen yazı</span></div>
-          <div><strong>{overview.topRisk?.qualityIssues.length || 0}</strong><span>En yüksek risk</span></div>
+          <div><strong>{overview.averageScore}%</strong><span>Ortalama skor</span></div>
         </div>
         {overview.topRisk ? (
           <p className="notice">Öncelik: <strong>{overview.topRisk.post.title}</strong> — {overview.topRisk.qualityIssues.slice(0, 3).join(', ')}</p>
@@ -190,7 +214,7 @@ export function DashboardOverview({ posts }) {
         <div className="quality-summary">
           <div><strong>{overview.scheduled.length}</strong><span>Zamanlanmış</span></div>
           <div><strong>{overview.dueSoon.length}</strong><span>7 gün içinde</span></div>
-          <div><strong>{overview.datedDrafts.length}</strong><span>Tarihli taslak</span></div>
+          <div><strong>{overview.unscheduledDrafts.length}</strong><span>Plansız taslak</span></div>
         </div>
         {overview.nextPost ? (
           <p className="notice">Sıradaki yayın: <strong>{overview.nextPost.title}</strong> — {formatDateTime(overview.nextPost.publishedAt)}</p>
@@ -216,6 +240,49 @@ export function DashboardOverview({ posts }) {
         ) : (
           <p className="notice">Yayın öncesi kritik SEO eşiği izleniyor; eksik yazılar onarım kuyruğunda tutuluyor.</p>
         )}
+      </article>
+
+      <article className="panel overview-card production-queue-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Üretim Kuyruğu</p><h2>Eksik iş paketleri</h2></div>
+          <a className="row-action" href="/dashboard/seo-guard">Onarım kuyruğu</a>
+        </div>
+        <div className="quality-summary">
+          <div><strong>{overview.needsContent.length}</strong><span>Kısa içerik</span></div>
+          <div><strong>{overview.missingMediaMeta.length}</strong><span>Medya eksiği</span></div>
+          <div><strong>{overview.seoQueue.length}</strong><span>SEO kuyruğu</span></div>
+        </div>
+        <p className="notice">Bu kart içerik üretiminde sıradaki toplu işleri gösterir; dış servis gerektirmez ve yerel testte yalnızca okuma/bağlantı davranışı oluşturur.</p>
+      </article>
+
+      <article className="panel overview-card seo-priority-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">SEO Öncelik Listesi</p><h2>İlk düzeltilecekler</h2></div>
+          <a className="row-action" href="/dashboard/seo-guard?filter=critical">Filtrele</a>
+        </div>
+        {topSeoQueue.length ? (
+          <div className="priority-list">
+            {topSeoQueue.map((item) => (
+              <a className={`priority-item priority-${item.status}`} href={getEditorHref(item.post)} key={item.post.id}>
+                <strong>{item.post.title}</strong>
+                <span>{item.criticalSeoIssues.length ? item.criticalSeoIssues.join(', ') : item.qualityIssues.filter((issue) => issue.startsWith('SEO')).join(', ')}</span>
+                <em>{item.score}%</em>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="success">SEO onarım kuyruğunda kritik yazı yok.</p>
+        )}
+      </article>
+
+      <article className="panel overview-card workflow-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Yayın Akışı</p><h2>Güvenli sıra</h2></div>
+          <a className="row-action" href="/dashboard/calendar">Takvim</a>
+        </div>
+        <ol className="publishing-checklist compact-checklist">
+          {safetyWorkflow.map((item) => <li key={item}>{item}</li>)}
+        </ol>
       </article>
 
       <article className="panel overview-card quick-actions-card">

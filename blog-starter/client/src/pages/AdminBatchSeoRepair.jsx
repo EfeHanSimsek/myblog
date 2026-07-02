@@ -115,6 +115,7 @@ export function AdminBatchSeoRepair() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [filter, setFilter] = useState('fixable');
   const [isApplying, setIsApplying] = useState(false);
+  const [rollbackId, setRollbackId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [lastReport, setLastReport] = useState(null);
@@ -123,7 +124,7 @@ export function AdminBatchSeoRepair() {
   async function load() {
     const [postData, logData] = await Promise.all([
       api('/posts?includeDrafts=true'),
-      api('/posts/seo/batch-repair/logs')
+      api('/seo-repair/logs')
     ]);
     setPosts(postData.posts || []);
     setRepairLogs(logData.logs || []);
@@ -204,6 +205,27 @@ export function AdminBatchSeoRepair() {
     }
   }
 
+  async function rollbackLog(log) {
+    if (!log?.rollbackAvailable) {
+      setError('Bu işlem logunda geri alma verisi yok. Yeni rollback uyumlu loglar için kullanılabilir.');
+      return;
+    }
+
+    setRollbackId(log.id);
+    setError('');
+    setMessage('');
+
+    try {
+      const data = await api(`/seo-repair/logs/${log.id}/rollback`, { method: 'POST' });
+      setMessage(`${data.report?.restoredCount || 0} yazı geri alındı. ${data.report?.skippedCount || 0} yazı atlandı.`);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRollbackId('');
+    }
+  }
+
   return (
     <section className="page stack batch-seo-page">
       <div className="section-heading">
@@ -230,7 +252,7 @@ export function AdminBatchSeoRepair() {
         <div>
           <p className="eyebrow">Güvenli backend işlem</p>
           <h2>Durum değiştirmeden metadata önerisi uygula</h2>
-          <p className="notice">Bu işlem artık tek bir backend batch endpoint üzerinden çalışır. Yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez ve her işlem için rapor/log üretir.</p>
+          <p className="notice">Bu işlem yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez ve her işlem için rapor/log üretir. Yeni loglar geri alma uygunluğu göstergesiyle listelenir.</p>
         </div>
         <div className="batch-seo-toolbar">
           <label>Filtre
@@ -336,6 +358,14 @@ export function AdminBatchSeoRepair() {
             <div className="batch-log-row" key={log.id}>
               <strong>{formatDate(log.createdAt)}</strong>
               <span>{log.repairedCount} onarıldı · {log.skippedCount} atlandı · {log.changedFieldCount} alan değişti</span>
+              <div className="batch-log-row-actions">
+                <span className={`batch-rollback-note ${log.rollbackAvailable ? 'ready' : 'locked'}`}>
+                  {log.rolledBackAt ? `Geri alındı: ${formatDate(log.rolledBackAt)}` : log.rollbackAvailable ? 'Geri alma hazır' : 'Eski log / geri alma verisi yok'}
+                </span>
+                <button type="button" disabled={!log.rollbackAvailable || rollbackId === log.id} onClick={() => rollbackLog(log)}>
+                  {rollbackId === log.id ? 'Geri alınıyor...' : 'Geri al'}
+                </button>
+              </div>
             </div>
           ))}
           {!repairLogs.length && <p className="notice">Henüz backend batch SEO onarım geçmişi yok.</p>}

@@ -138,48 +138,56 @@ function getEditorSeoChecklist(form) {
   return [
     {
       key: 'title',
+      field: 'title',
       ok: titleLength >= 20 && titleLength <= 80,
       label: 'Başlık uzunluğu',
       detail: `${titleLength} karakter — ideal aralık 20-80.`
     },
     {
       key: 'slug',
+      field: 'slug',
       ok: slugLength > 0 && slugLength <= 80,
       label: 'SEO slug',
       detail: slugLength ? `${slugLength} karakterlik slug hazır.` : 'Slug boşsa başlıktan otomatik üretilecek.'
     },
     {
       key: 'summary',
+      field: 'summary',
       ok: summaryLength >= 60,
       label: 'Yazı özeti',
       detail: `${summaryLength} karakter — listeleme ve paylaşım için en az 60 önerilir.`
     },
     {
       key: 'seo-title',
+      field: 'seoTitle',
       ok: seoTitleLength >= 30 && seoTitleLength <= 70,
       label: 'SEO başlığı',
       detail: `${seoTitleLength}/70 karakter — ideal aralık 30-70.`
     },
     {
       key: 'seo-description',
+      field: 'seoDescription',
       ok: seoDescriptionLength >= 90 && seoDescriptionLength <= 160,
       label: 'SEO açıklaması',
       detail: `${seoDescriptionLength}/160 karakter — ideal aralık 90-160.`
     },
     {
       key: 'cover-alt',
+      field: 'altCoverImage',
       ok: !form.coverImage || form.altCoverImage.trim().length >= 8,
       label: 'Kapak alt metni',
       detail: form.coverImage ? 'Kapak görseli varsa açıklayıcı alt metin gerekli.' : 'Kapak görseli eklenirse alt metin de doldur.'
     },
     {
       key: 'tags',
+      field: 'tags',
       ok: tagCount >= 2,
       label: 'Etiket sayısı',
       detail: `${tagCount} etiket — keşif için en az 2 etiket önerilir.`
     },
     {
       key: 'content',
+      field: 'content',
       ok: wordCount >= 300,
       label: 'İçerik uzunluğu',
       detail: `${wordCount} kelime — kalıcı blog yazıları için en az 300 önerilir.`
@@ -219,6 +227,7 @@ export function Dashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingMedia, setIsSavingMedia] = useState(false);
   const [isExportingBackup, setIsExportingBackup] = useState(false);
+  const [seoRepairMode, setSeoRepairMode] = useState(false);
 
   async function load() {
     const [postData, statData, commentData, mediaData] = await Promise.all([
@@ -240,15 +249,17 @@ export function Dashboard() {
     const editId = searchParams.get('edit');
     if (!editId || !posts.length) return;
 
+    const focusMode = searchParams.get('focus');
     const targetPost = posts.find((post) => String(post.id) === editId);
     if (!targetPost) {
-      setError('Takvimden seçilen yazı bulunamadı.');
+      setError('Seçilen yazı bulunamadı.');
       setSearchParams({}, { replace: true });
       return;
     }
 
     edit(targetPost);
-    setMessage('Takvimden seçilen yazı editöre yüklendi.');
+    setSeoRepairMode(focusMode === 'seo');
+    setMessage(focusMode === 'seo' ? 'SEO Onarım panelinden seçilen yazı editöre yüklendi. Eksik kontroller aşağıda vurgulandı.' : 'Takvimden seçilen yazı editöre yüklendi.');
     setSearchParams({}, { replace: true });
   }, [posts, searchParams, setSearchParams]);
 
@@ -284,6 +295,7 @@ export function Dashboard() {
   const planningWarning = useMemo(() => getPlanningWarning(form), [form]);
   const editorSeoChecklist = useMemo(() => getEditorSeoChecklist(form), [form]);
   const editorSeoReadyCount = editorSeoChecklist.filter((item) => item.ok).length;
+  const editorSeoMissing = editorSeoChecklist.filter((item) => !item.ok);
 
   function setField(name, value) {
     setForm((current) => {
@@ -306,6 +318,13 @@ export function Dashboard() {
       if (name === 'title' && (!current.altText || current.altText === current.title)) return { ...current, title: value, altText: value };
       return { ...current, [name]: value };
     });
+  }
+
+  function focusSeoField(field) {
+    const target = document.querySelector(`[data-seo-field="${field}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.focus({ preventScroll: true });
   }
 
   function useMediaAsCover(item) {
@@ -377,6 +396,7 @@ export function Dashboard() {
         setMessage('Yazı oluşturuldu.');
       }
       setForm(emptyForm);
+      setSeoRepairMode(false);
       await load();
     } catch (err) {
       setError(err.message);
@@ -487,7 +507,7 @@ export function Dashboard() {
         <p className="notice">Yazılar, kullanıcılar, yorumlar, medya kayıtları ve ayarlar tek bir JSON dosyası olarak dışa aktarılır.</p>
       </div>
 
-      <form className="panel editor" onSubmit={submit}>
+      <form className={`panel editor ${seoRepairMode ? 'seo-repair-editor' : ''}`} onSubmit={submit}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">Editör</p>
@@ -495,14 +515,20 @@ export function Dashboard() {
           </div>
           {form.slug && <span className="slug-preview">/{form.slug}</span>}
         </div>
+        {seoRepairMode && (
+          <div className="seo-repair-callout">
+            <strong>SEO onarım modu açık</strong>
+            <span>{editorSeoMissing.length ? `${editorSeoMissing.length} eksik kontrol var. Eksik kartlardaki “Alana git” butonu ilgili inputu açar.` : 'Bu yazı temel SEO kontrollerini tamamladı.'}</span>
+          </div>
+        )}
         <div className="form-grid">
-          <label>Başlık<input value={form.title} onChange={(e) => setField('title', e.target.value)} required /></label>
-          <label>Slug<input value={form.slug} onChange={(e) => setField('slug', createSlug(e.target.value))} placeholder="Boşsa otomatik üretilir" /></label>
+          <label>Başlık<input data-seo-field="title" value={form.title} onChange={(e) => setField('title', e.target.value)} required /></label>
+          <label>Slug<input data-seo-field="slug" value={form.slug} onChange={(e) => setField('slug', createSlug(e.target.value))} placeholder="Boşsa otomatik üretilir" /></label>
           <label>Kategori<input value={form.category} onChange={(e) => setField('category', e.target.value)} /></label>
           <label>Durum<select value={form.status} onChange={(e) => setField('status', e.target.value)}><option value="draft">Taslak</option><option value="published">Yayında</option></select></label>
         </div>
-        <label>SEO Başlığı<input value={form.seoTitle} onChange={(e) => setField('seoTitle', e.target.value.slice(0, 70))} maxLength="70" placeholder="Arama motorlarında görünecek başlık" /><span className="field-hint">{form.seoTitle.length}/70 karakter</span></label>
-        <label>SEO Açıklaması<textarea value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
+        <label>SEO Başlığı<input data-seo-field="seoTitle" value={form.seoTitle} onChange={(e) => setField('seoTitle', e.target.value.slice(0, 70))} maxLength="70" placeholder="Arama motorlarında görünecek başlık" /><span className="field-hint">{form.seoTitle.length}/70 karakter</span></label>
+        <label>SEO Açıklaması<textarea data-seo-field="seoDescription" value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
         <label>Yayın Tarihi<input type="datetime-local" value={form.publishedAt} onChange={(e) => setField('publishedAt', e.target.value)} /><span className="field-hint">Boş bırakılırsa yayın sırasında otomatik atanır.</span></label>
         {planningWarning && <div className={`planning-hint planning-${planningWarning.type}`}><strong>{planningWarning.title}</strong><span>{planningWarning.text}</span></div>}
         <div className="seo-checklist">
@@ -518,19 +544,20 @@ export function Dashboard() {
               <div className={`seo-check-item ${item.ok ? 'seo-check-ok' : 'seo-check-missing'}`} key={item.key}>
                 <strong>{item.ok ? 'Hazır' : 'Eksik'} · {item.label}</strong>
                 <span>{item.detail}</span>
+                {!item.ok && <button className="mini-action" type="button" onClick={() => focusSeoField(item.field)}>Alana git</button>}
               </div>
             ))}
           </div>
         </div>
-        <label>Özet<textarea value={form.summary} onChange={(e) => setField('summary', e.target.value)} rows="2" /></label>
+        <label>Özet<textarea data-seo-field="summary" value={form.summary} onChange={(e) => setField('summary', e.target.value)} rows="2" /></label>
         <label>Kapak görseli URL<input value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} /></label>
-        <label>Kapak görseli alt metni<input value={form.altCoverImage} onChange={(e) => setField('altCoverImage', e.target.value)} placeholder="Görsel erişilebilirlik açıklaması" /></label>
+        <label>Kapak görseli alt metni<input data-seo-field="altCoverImage" value={form.altCoverImage} onChange={(e) => setField('altCoverImage', e.target.value)} placeholder="Görsel erişilebilirlik açıklaması" /></label>
         {media.some((item) => item.type === 'image') && <div className="media-picker"><strong>Medya kütüphanesinden kapak seç</strong><div className="media-strip">{media.filter((item) => item.type === 'image').slice(0, 8).map((item) => <button type="button" className="media-thumb" key={item.id} onClick={() => useMediaAsCover(item)}><img src={item.url} alt={item.altText || item.title} /><span>{item.title}</span></button>)}</div></div>}
-        <label>Etiketler<input value={form.tags} onChange={(e) => setField('tags', e.target.value)} placeholder="react, blog, cms" /></label>
-        <label>İçerik<textarea value={form.content} onChange={(e) => setField('content', e.target.value)} rows="10" required /></label>
+        <label>Etiketler<input data-seo-field="tags" value={form.tags} onChange={(e) => setField('tags', e.target.value)} placeholder="react, blog, cms" /></label>
+        <label>İçerik<textarea data-seo-field="content" value={form.content} onChange={(e) => setField('content', e.target.value)} rows="10" required /></label>
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
-        <div className="actions"><button disabled={isSaving}>{isSaving ? 'Kaydediliyor...' : form.id ? 'Güncelle' : 'Oluştur'}</button><button type="button" onClick={() => setForm(emptyForm)}>Temizle</button></div>
+        <div className="actions"><button disabled={isSaving}>{isSaving ? 'Kaydediliyor...' : form.id ? 'Güncelle' : 'Oluştur'}</button><button type="button" onClick={() => { setForm(emptyForm); setSeoRepairMode(false); }}>Temizle</button></div>
       </form>
 
       <div className="panel media-library">

@@ -66,6 +66,10 @@ function buildWeeks(anchorDate) {
   });
 }
 
+function getEditorLink(post) {
+  return `/dashboard?edit=${encodeURIComponent(post.id)}`;
+}
+
 function getPlanningWarnings(posts) {
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -231,10 +235,10 @@ export function AdminCalendar() {
                   {dayPosts.slice(0, 3).map((post) => {
                     const state = getPublishState(post, today);
                     return (
-                      <div className={`calendar-item tone-${state.tone}`} key={post.id} title={post.title}>
+                      <Link className={`calendar-item tone-${state.tone}`} key={post.id} title={`${post.title} yazısını düzenle`} to={getEditorLink(post)}>
                         <span>{state.label}</span>
                         <strong>{post.title}</strong>
-                      </div>
+                      </Link>
                     );
                   })}
                   {dayPosts.length > 3 && <span className="calendar-more">+{dayPosts.length - 3} içerik</span>}
@@ -256,12 +260,12 @@ export function AdminCalendar() {
           </div>
           <div className="table-list">
             {scheduledPosts.slice(0, 12).map((post) => (
-              <div className="table-row" key={post.id}>
+              <Link className="table-row" key={post.id} to={getEditorLink(post)}>
                 <div>
                   <strong>{post.title}</strong>
                   <span>{formatDate(post.publishedAt)} · {formatTime(post.publishedAt)} · {post.category || 'Genel'}</span>
                 </div>
-              </div>
+              </Link>
             ))}
             {!scheduledPosts.length && <p className="notice">Henüz ileri tarihli yayın yok. Panelde durum “Yayında” seçilip gelecek bir yayın tarihi girildiğinde burada görünür.</p>}
           </div>
@@ -277,12 +281,12 @@ export function AdminCalendar() {
           </div>
           <div className="table-list">
             {draftPosts.slice(0, 12).map((post) => (
-              <div className="table-row" key={post.id}>
+              <Link className="table-row" key={post.id} to={getEditorLink(post)}>
                 <div>
                   <strong>{post.title}</strong>
                   <span>Son güncelleme: {formatDate(post.updatedAt || post.createdAt)} · {post.category || 'Genel'}</span>
                 </div>
-              </div>
+              </Link>
             ))}
             {!draftPosts.length && <p className="notice">Taslak kuyruğu boş.</p>}
           </div>

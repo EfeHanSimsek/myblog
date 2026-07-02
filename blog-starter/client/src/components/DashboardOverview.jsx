@@ -70,24 +70,38 @@ function getPublishSafety(post) {
   };
 }
 
+function getSortableDate(post) {
+  const rawDate = post.publishedAt || post.updatedAt || post.createdAt || '';
+  const date = new Date(rawDate).getTime();
+  return Number.isNaN(date) ? Number.MAX_SAFE_INTEGER : date;
+}
+
 function getOverview(posts) {
   const now = Date.now();
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   const scheduled = posts
     .filter((post) => post.status === 'published' && post.publishedAt && new Date(post.publishedAt).getTime() > now)
     .sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
   const dueSoon = scheduled.filter((post) => new Date(post.publishedAt).getTime() - now <= sevenDays);
   const datedDrafts = posts.filter((post) => post.status === 'draft' && post.publishedAt);
   const unscheduledDrafts = posts.filter((post) => post.status === 'draft' && !post.publishedAt);
+  const staleDrafts = unscheduledDrafts.filter((post) => {
+    const date = new Date(post.updatedAt || post.createdAt || '').getTime();
+    return Number.isNaN(date) ? false : now - date >= thirtyDays;
+  });
   const safety = posts.map(getPublishSafety);
   const riskyPosts = safety
     .filter((item) => item.qualityIssues.length)
     .sort((a, b) => b.criticalSeoIssues.length - a.criticalSeoIssues.length || b.qualityIssues.length - a.qualityIssues.length || a.score - b.score);
   const publishedBlockers = safety.filter((item) => item.isPublished && item.criticalSeoIssues.length);
-  const publishReadyDrafts = safety.filter((item) => item.post.status === 'draft' && item.isReady);
+  const publishReadyDrafts = safety
+    .filter((item) => item.post.status === 'draft' && item.isReady)
+    .sort((a, b) => getSortableDate(a.post) - getSortableDate(b.post));
   const criticalDrafts = safety.filter((item) => item.post.status === 'draft' && item.criticalSeoIssues.length);
   const needsContent = safety.filter((item) => item.qualityIssues.includes('İçerik kısa'));
   const missingMediaMeta = safety.filter((item) => item.qualityIssues.includes('Kapak görseli eksik') || item.qualityIssues.includes('Kapak alt metni eksik'));
+  const lowScorePosts = safety.filter((item) => item.score < 70).sort((a, b) => a.score - b.score);
   const seoQueue = safety
     .filter((item) => item.criticalSeoIssues.length || item.qualityIssues.some((issue) => issue.startsWith('SEO')))
     .sort((a, b) => b.criticalSeoIssues.length - a.criticalSeoIssues.length || a.score - b.score);
@@ -98,6 +112,7 @@ function getOverview(posts) {
     dueSoon,
     datedDrafts,
     unscheduledDrafts,
+    staleDrafts,
     riskyPosts,
     readyPosts: safety.filter((item) => item.isReady).length,
     publishedBlockers,
@@ -105,6 +120,7 @@ function getOverview(posts) {
     criticalDrafts,
     needsContent,
     missingMediaMeta,
+    lowScorePosts,
     seoQueue,
     averageScore,
     nextPost: scheduled[0] || null,
@@ -186,6 +202,9 @@ function getEditorHref(post) {
 export function DashboardOverview({ posts }) {
   const overview = getOverview(posts || []);
   const topSeoQueue = overview.seoQueue.slice(0, 3);
+  const topReadyDrafts = overview.publishReadyDrafts.slice(0, 3);
+  const topDueSoon = overview.dueSoon.slice(0, 3);
+  const topLowScorePosts = overview.lowScorePosts.slice(0, 3);
 
   return (
     <div className="overview-grid">
@@ -242,6 +261,51 @@ export function DashboardOverview({ posts }) {
         )}
       </article>
 
+      <article className="panel overview-card decision-board-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Yayın Karar Masası</p><h2>Bugün ne yayınlanabilir?</h2></div>
+          <a className="row-action" href="/dashboard/seo-guard?filter=ready">Hazırları aç</a>
+        </div>
+        <div className="quality-summary">
+          <div><strong>{overview.publishReadyDrafts.length}</strong><span>Hazır taslak</span></div>
+          <div><strong>{overview.datedDrafts.length}</strong><span>Tarihli taslak</span></div>
+          <div><strong>{overview.staleDrafts.length}</strong><span>Eski plansız</span></div>
+        </div>
+        {topReadyDrafts.length ? (
+          <div className="priority-list compact-priority-list">
+            {topReadyDrafts.map((item) => (
+              <a className="priority-item priority-ready" href={getEditorHref(item.post)} key={item.post.id}>
+                <strong>{item.post.title}</strong>
+                <span>{item.post.publishedAt ? `Plan: ${formatDateTime(item.post.publishedAt)}` : 'Tarih yok — yayın takvimine yerleştirilebilir.'}</span>
+                <em>{item.score}%</em>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="notice">Yayına tamamen hazır taslak yok; önce SEO ve içerik eksiği olanları kapat.</p>
+        )}
+      </article>
+
+      <article className="panel overview-card schedule-risk-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Haftalık Takvim Riski</p><h2>Yaklaşan yayınlar</h2></div>
+          <a className="row-action" href="/dashboard/calendar">Takvimi aç</a>
+        </div>
+        {topDueSoon.length ? (
+          <div className="priority-list compact-priority-list">
+            {topDueSoon.map((post) => (
+              <a className="priority-item priority-ready" href={getEditorHref(post)} key={post.id}>
+                <strong>{post.title}</strong>
+                <span>{formatDateTime(post.publishedAt)}</span>
+                <em>7g</em>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="notice">Önümüzdeki 7 gün için zamanlanmış yayın görünmüyor. Hazır taslaklardan takvime yayın ekleyebilirsin.</p>
+        )}
+      </article>
+
       <article className="panel overview-card production-queue-card">
         <div className="section-heading">
           <div><p className="eyebrow">Üretim Kuyruğu</p><h2>Eksik iş paketleri</h2></div>
@@ -253,6 +317,26 @@ export function DashboardOverview({ posts }) {
           <div><strong>{overview.seoQueue.length}</strong><span>SEO kuyruğu</span></div>
         </div>
         <p className="notice">Bu kart içerik üretiminde sıradaki toplu işleri gösterir; dış servis gerektirmez ve yerel testte yalnızca okuma/bağlantı davranışı oluşturur.</p>
+      </article>
+
+      <article className="panel overview-card batch-repair-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Toplu Onarım Paketleri</p><h2>En düşük skorlar</h2></div>
+          <a className="row-action" href="/dashboard/quality">Kaliteye git</a>
+        </div>
+        {topLowScorePosts.length ? (
+          <div className="priority-list compact-priority-list">
+            {topLowScorePosts.map((item) => (
+              <a className={`priority-item priority-${item.status}`} href={getEditorHref(item.post)} key={item.post.id}>
+                <strong>{item.post.title}</strong>
+                <span>{item.qualityIssues.slice(0, 3).join(', ')}</span>
+                <em>{item.score}%</em>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="success">70 altı kalite skoru olan yazı yok.</p>
+        )}
       </article>
 
       <article className="panel overview-card seo-priority-card">

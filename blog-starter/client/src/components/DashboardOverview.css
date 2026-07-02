@@ -3,6 +3,16 @@
   grid-column: 1 / -1;
 }
 
+.publish-safety-card {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.publish-safety-card .error,
+.publish-safety-card .success,
+.publish-safety-card .notice {
+  margin-bottom: 0;
+}
+
 .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

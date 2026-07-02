@@ -15,6 +15,15 @@ function parseDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function toLocalDateKey(value) {
+  const date = value instanceof Date ? value : parseDate(value);
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatDate(value, options = {}) {
   const date = value instanceof Date ? value : parseDate(value);
   if (!date) return 'Tarih yok';
@@ -50,7 +59,7 @@ function buildWeeks(anchorDate) {
     const date = new Date(start.getTime() + index * DAY_MS);
     return {
       date,
-      key: date.toISOString().slice(0, 10),
+      key: toLocalDateKey(date),
       inMonth: date.getMonth() === anchorDate.getMonth()
     };
   });
@@ -78,13 +87,14 @@ export function AdminCalendar() {
   }, []);
 
   const today = useMemo(() => startOfToday(), []);
+  const todayKey = useMemo(() => toLocalDateKey(today), [today]);
   const calendarDays = useMemo(() => buildWeeks(anchor), [anchor]);
 
   const postsByDate = useMemo(() => {
     return posts.reduce((acc, post) => {
       const date = getPostDate(post);
       if (!date) return acc;
-      const key = date.toISOString().slice(0, 10);
+      const key = toLocalDateKey(date);
       if (!acc[key]) acc[key] = [];
       acc[key].push(post);
       return acc;
@@ -148,7 +158,7 @@ export function AdminCalendar() {
         <div className="calendar-grid">
           {calendarDays.map((day) => {
             const dayPosts = postsByDate[day.key] || [];
-            const isToday = day.key === today.toISOString().slice(0, 10);
+            const isToday = day.key === todayKey;
             return (
               <article className={`calendar-day${day.inMonth ? '' : ' is-outside'}${isToday ? ' is-today' : ''}`} key={day.key}>
                 <div className="calendar-day-head">

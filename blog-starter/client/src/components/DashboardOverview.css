@@ -1,4 +1,5 @@
-.quick-actions-card {
+.quick-actions-card,
+.publishing-checklist-card {
   grid-column: 1 / -1;
 }
 
@@ -29,6 +30,42 @@
   color: #d8dee9;
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.publishing-checklist {
+  counter-reset: publish-step;
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.publishing-checklist li {
+  align-items: center;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  border-radius: 18px;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: auto 1fr;
+  line-height: 1.45;
+  padding: 0.85rem 1rem;
+}
+
+.publishing-checklist li::before {
+  align-items: center;
+  background: #111827;
+  border-radius: 999px;
+  color: #fff;
+  content: counter(publish-step);
+  counter-increment: publish-step;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 800;
+  height: 1.7rem;
+  justify-content: center;
+  width: 1.7rem;
 }
 
 .editor,

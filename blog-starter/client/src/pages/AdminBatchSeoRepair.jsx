@@ -102,13 +102,12 @@ function getRepairPlan(post) {
   };
 }
 
-function buildPayload(post, suggestions) {
-  return {
-    ...post,
-    ...suggestions,
-    tags: suggestions.tags,
-    publishedAt: post.publishedAt || ''
-  };
+function formatDate(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(new Date(value));
 }
 
 export function AdminBatchSeoRepair() {
@@ -118,10 +117,16 @@ export function AdminBatchSeoRepair() {
   const [isApplying, setIsApplying] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [lastReport, setLastReport] = useState(null);
+  const [repairLogs, setRepairLogs] = useState([]);
 
   async function load() {
-    const data = await api('/posts?includeDrafts=true');
-    setPosts(data.posts || []);
+    const [postData, logData] = await Promise.all([
+      api('/posts?includeDrafts=true'),
+      api('/posts/seo/batch-repair/logs')
+    ]);
+    setPosts(postData.posts || []);
+    setRepairLogs(logData.logs || []);
   }
 
   useEffect(() => {
@@ -152,19 +157,24 @@ export function AdminBatchSeoRepair() {
     fixable: plans.filter((plan) => plan.canBatchRepair).length,
     critical: plans.filter((plan) => plan.critical.length).length,
     manual: plans.filter((plan) => plan.manual.length).length,
-    selected: selectedPlans.length
-  }), [plans, selectedPlans]);
+    selected: selectedPlans.length,
+    lastRunChanged: repairLogs[0]?.changedFieldCount || 0
+  }), [plans, repairLogs, selectedPlans]);
 
   function toggleSelected(id) {
     setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
   function selectVisible() {
-    setSelectedIds(filteredPlans.filter((plan) => plan.canBatchRepair).map((plan) => plan.post.id));
+    setSelectedIds(filteredPlans.filter((plan) => plan.canBatchRepair).slice(0, 25).map((plan) => plan.post.id));
   }
 
   function selectTopFive() {
     setSelectedIds(plans.filter((plan) => plan.canBatchRepair).slice(0, 5).map((plan) => plan.post.id));
+  }
+
+  function selectPublishedCritical() {
+    setSelectedIds(plans.filter((plan) => plan.post.status === 'published' && plan.critical.length && plan.canBatchRepair).slice(0, 25).map((plan) => plan.post.id));
   }
 
   async function applySelectedRepairs() {
@@ -176,15 +186,15 @@ export function AdminBatchSeoRepair() {
     setIsApplying(true);
     setError('');
     setMessage('');
+    setLastReport(null);
 
     try {
-      for (const plan of selectedPlans) {
-        await api(`/posts/${plan.post.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(buildPayload(plan.post, plan.suggestions))
-        });
-      }
-      setMessage(`${selectedPlans.length} yazı için güvenli SEO metadata önerileri uygulandı. İçerik uzunluğu gibi manuel işler değiştirilmedi.`);
+      const data = await api('/posts/seo/batch-repair', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedPlans.map((plan) => plan.post.id) })
+      });
+      setLastReport(data.report || null);
+      setMessage(`${data.report?.repairedCount || 0} yazı backend batch endpoint ile onarıldı. ${data.report?.skippedCount || 0} yazı atlandı.`);
       setSelectedIds([]);
       await load();
     } catch (err) {
@@ -212,14 +222,15 @@ export function AdminBatchSeoRepair() {
         <div><strong>{totals.critical}</strong><span>Kritik eksikli</span></div>
         <div><strong>{totals.manual}</strong><span>Manuel iş isteyen</span></div>
         <div><strong>{totals.selected}</strong><span>Seçili</span></div>
+        <div><strong>{totals.lastRunChanged}</strong><span>Son log alan değişimi</span></div>
         <div><strong>{totals.total}</strong><span>Toplam yazı</span></div>
       </div>
 
       <div className="panel batch-seo-control-panel">
         <div>
-          <p className="eyebrow">Güvenli kapsam</p>
+          <p className="eyebrow">Güvenli backend işlem</p>
           <h2>Durum değiştirmeden metadata önerisi uygula</h2>
-          <p className="notice">Bu işlem yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez. Sadece slug, özet, SEO başlığı, SEO açıklaması, kapak alt metni ve etiket gibi dış servis gerektirmeyen alanları doldurur.</p>
+          <p className="notice">Bu işlem artık tek bir backend batch endpoint üzerinden çalışır. Yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez ve her işlem için rapor/log üretir.</p>
         </div>
         <div className="batch-seo-toolbar">
           <label>Filtre
@@ -233,13 +244,40 @@ export function AdminBatchSeoRepair() {
           </label>
           <button type="button" onClick={selectTopFive}>İlk 5 önceliği seç</button>
           <button type="button" onClick={selectVisible}>Görünenleri seç</button>
+          <button type="button" onClick={selectPublishedCritical}>Yayındaki kritikleri seç</button>
           <button type="button" onClick={() => setSelectedIds([])}>Seçimi temizle</button>
-          <button type="button" onClick={applySelectedRepairs} disabled={isApplying || !selectedPlans.length}>{isApplying ? 'Uygulanıyor...' : 'Seçili önerileri uygula'}</button>
+          <button type="button" onClick={applySelectedRepairs} disabled={isApplying || !selectedPlans.length}>{isApplying ? 'Backend uygulanıyor...' : 'Seçili önerileri uygula'}</button>
         </div>
       </div>
 
       {message && <p className="success">{message}</p>}
       {error && <p className="error">{error}</p>}
+
+      {lastReport && (
+        <div className="panel batch-report-panel">
+          <div className="section-heading compact-heading">
+            <div>
+              <p className="eyebrow">İşlem raporu</p>
+              <h2>Son batch sonucu</h2>
+            </div>
+            <span className="seo-state-pill neutral">{formatDate(lastReport.createdAt)}</span>
+          </div>
+          <div className="batch-report-grid">
+            <div><strong>{lastReport.requestedCount}</strong><span>İstenen</span></div>
+            <div><strong>{lastReport.repairedCount}</strong><span>Onarılan</span></div>
+            <div><strong>{lastReport.skippedCount}</strong><span>Atlanan</span></div>
+            <div><strong>{lastReport.changedFieldCount}</strong><span>Alan değişimi</span></div>
+          </div>
+          <div className="batch-log-list">
+            {(lastReport.results || []).slice(0, 8).map((item) => (
+              <div className="batch-log-row" key={item.id}>
+                <strong>{item.title || item.id}</strong>
+                <span>{item.status === 'repaired' ? `Değişen: ${item.changedFields.join(', ')}` : item.reason}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="batch-seo-grid">
         {filteredPlans.map((plan) => {
@@ -284,6 +322,24 @@ export function AdminBatchSeoRepair() {
         })}
 
         {!filteredPlans.length && <p className="success">Bu filtrede toplu onarım adayı yok.</p>}
+      </div>
+
+      <div className="panel batch-history-panel">
+        <div className="section-heading compact-heading">
+          <div>
+            <p className="eyebrow">İşlem geçmişi</p>
+            <h2>Son backend batch logları</h2>
+          </div>
+        </div>
+        <div className="batch-log-list">
+          {repairLogs.slice(0, 6).map((log) => (
+            <div className="batch-log-row" key={log.id}>
+              <strong>{formatDate(log.createdAt)}</strong>
+              <span>{log.repairedCount} onarıldı · {log.skippedCount} atlandı · {log.changedFieldCount} alan değişti</span>
+            </div>
+          ))}
+          {!repairLogs.length && <p className="notice">Henüz backend batch SEO onarım geçmişi yok.</p>}
+        </div>
       </div>
     </section>
   );

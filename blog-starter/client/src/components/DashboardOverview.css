@@ -200,6 +200,44 @@
   box-shadow: 0 20px 50px rgba(17, 24, 39, 0.06), 0 0 0 4px rgba(124, 58, 237, 0.14);
 }
 
+.publish-guard-legend {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.publish-guard-legend div {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 1rem;
+}
+
+.publish-guard-legend strong {
+  color: #111827;
+}
+
+.publish-guard-legend span {
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.publish-guard-critical {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.24) !important;
+}
+
+.publish-guard-warning {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.24) !important;
+}
+
+.publish-guard-ready {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.24) !important;
+}
+
 @media (max-width: 960px) {
   .priority-item {
     grid-template-columns: 1fr;

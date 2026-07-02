@@ -195,6 +195,38 @@ function getEditorSeoChecklist(form) {
   ];
 }
 
+function cleanExcerpt(value, limit) {
+  return value
+    .replace(/[#>*_`\[\]()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, limit)
+    .replace(/\s+\S*$/, '')
+    .trim();
+}
+
+function getSeoSuggestions(form) {
+  const title = form.title.trim();
+  const category = form.category.trim();
+  const contentExcerpt = cleanExcerpt(form.content, 170);
+  const summaryBase = form.summary.trim() || contentExcerpt || (title ? `${title} hakkında kısa, anlaşılır ve güncel bir blog özeti.` : 'Bu yazı için kısa, anlaşılır ve güncel bir blog özeti.');
+  const seoDescriptionBase = form.seoDescription.trim() || summaryBase;
+  const currentTags = form.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+  const suggestedTags = [category, ...title.split(/\s+/).filter((word) => word.length > 4).slice(0, 3)]
+    .map((tag) => tag.replace(/[,.!?;:]/g, '').trim())
+    .filter(Boolean);
+  const mergedTags = [...new Set([...currentTags, ...suggestedTags])].slice(0, 6);
+
+  return {
+    slug: form.slug.trim() || createSlug(title),
+    summary: form.summary.trim().length >= 60 ? form.summary : summaryBase.slice(0, 220),
+    seoTitle: form.seoTitle.trim().length >= 30 ? form.seoTitle : (title || summaryBase).slice(0, 70),
+    seoDescription: form.seoDescription.trim().length >= 90 ? form.seoDescription : seoDescriptionBase.slice(0, 160),
+    altCoverImage: !form.coverImage || form.altCoverImage.trim().length >= 8 ? form.altCoverImage : `${title || category || 'Blog yazısı'} kapak görseli`,
+    tags: mergedTags.length >= 2 ? mergedTags.join(', ') : form.tags
+  };
+}
+
 function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -325,6 +357,12 @@ export function Dashboard() {
     if (!target) return;
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     target.focus({ preventScroll: true });
+  }
+
+  function applySeoSuggestions() {
+    setForm((current) => ({ ...current, ...getSeoSuggestions(current) }));
+    setSeoRepairMode(true);
+    setMessage('Eksik SEO alanları güvenli önerilerle dolduruldu. Kaydetmeden önce metinleri kontrol et.');
   }
 
   function useMediaAsCover(item) {
@@ -537,7 +575,10 @@ export function Dashboard() {
               <p className="eyebrow">Canlı SEO Checklist</p>
               <h3>{editorSeoReadyCount} / {editorSeoChecklist.length} kontrol hazır</h3>
             </div>
-            <span className="quality-score">{Math.round((editorSeoReadyCount / editorSeoChecklist.length) * 100)}%</span>
+            <div className="actions compact-actions">
+              <span className="quality-score">{Math.round((editorSeoReadyCount / editorSeoChecklist.length) * 100)}%</span>
+              <button className="mini-action" type="button" onClick={applySeoSuggestions} disabled={!editorSeoMissing.length}>Eksikleri öneriyle doldur</button>
+            </div>
           </div>
           <div className="seo-checklist-grid">
             {editorSeoChecklist.map((item) => (

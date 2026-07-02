@@ -126,6 +126,67 @@ function getPlanningWarning(form) {
   };
 }
 
+function getEditorSeoChecklist(form) {
+  const titleLength = form.title.trim().length;
+  const slugLength = form.slug.trim().length;
+  const summaryLength = form.summary.trim().length;
+  const seoTitleLength = form.seoTitle.trim().length;
+  const seoDescriptionLength = form.seoDescription.trim().length;
+  const wordCount = form.content.trim().split(/\s+/).filter(Boolean).length;
+  const tagCount = form.tags.split(',').map((tag) => tag.trim()).filter(Boolean).length;
+
+  return [
+    {
+      key: 'title',
+      ok: titleLength >= 20 && titleLength <= 80,
+      label: 'Başlık uzunluğu',
+      detail: `${titleLength} karakter — ideal aralık 20-80.`
+    },
+    {
+      key: 'slug',
+      ok: slugLength > 0 && slugLength <= 80,
+      label: 'SEO slug',
+      detail: slugLength ? `${slugLength} karakterlik slug hazır.` : 'Slug boşsa başlıktan otomatik üretilecek.'
+    },
+    {
+      key: 'summary',
+      ok: summaryLength >= 60,
+      label: 'Yazı özeti',
+      detail: `${summaryLength} karakter — listeleme ve paylaşım için en az 60 önerilir.`
+    },
+    {
+      key: 'seo-title',
+      ok: seoTitleLength >= 30 && seoTitleLength <= 70,
+      label: 'SEO başlığı',
+      detail: `${seoTitleLength}/70 karakter — ideal aralık 30-70.`
+    },
+    {
+      key: 'seo-description',
+      ok: seoDescriptionLength >= 90 && seoDescriptionLength <= 160,
+      label: 'SEO açıklaması',
+      detail: `${seoDescriptionLength}/160 karakter — ideal aralık 90-160.`
+    },
+    {
+      key: 'cover-alt',
+      ok: !form.coverImage || form.altCoverImage.trim().length >= 8,
+      label: 'Kapak alt metni',
+      detail: form.coverImage ? 'Kapak görseli varsa açıklayıcı alt metin gerekli.' : 'Kapak görseli eklenirse alt metin de doldur.'
+    },
+    {
+      key: 'tags',
+      ok: tagCount >= 2,
+      label: 'Etiket sayısı',
+      detail: `${tagCount} etiket — keşif için en az 2 etiket önerilir.`
+    },
+    {
+      key: 'content',
+      ok: wordCount >= 300,
+      label: 'İçerik uzunluğu',
+      detail: `${wordCount} kelime — kalıcı blog yazıları için en az 300 önerilir.`
+    }
+  ];
+}
+
 function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -221,6 +282,8 @@ export function Dashboard() {
   }, [media, mediaQuery, mediaTypeFilter]);
 
   const planningWarning = useMemo(() => getPlanningWarning(form), [form]);
+  const editorSeoChecklist = useMemo(() => getEditorSeoChecklist(form), [form]);
+  const editorSeoReadyCount = editorSeoChecklist.filter((item) => item.ok).length;
 
   function setField(name, value) {
     setForm((current) => {
@@ -442,6 +505,23 @@ export function Dashboard() {
         <label>SEO Açıklaması<textarea value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
         <label>Yayın Tarihi<input type="datetime-local" value={form.publishedAt} onChange={(e) => setField('publishedAt', e.target.value)} /><span className="field-hint">Boş bırakılırsa yayın sırasında otomatik atanır.</span></label>
         {planningWarning && <div className={`planning-hint planning-${planningWarning.type}`}><strong>{planningWarning.title}</strong><span>{planningWarning.text}</span></div>}
+        <div className="seo-checklist">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Canlı SEO Checklist</p>
+              <h3>{editorSeoReadyCount} / {editorSeoChecklist.length} kontrol hazır</h3>
+            </div>
+            <span className="quality-score">{Math.round((editorSeoReadyCount / editorSeoChecklist.length) * 100)}%</span>
+          </div>
+          <div className="seo-checklist-grid">
+            {editorSeoChecklist.map((item) => (
+              <div className={`seo-check-item ${item.ok ? 'seo-check-ok' : 'seo-check-missing'}`} key={item.key}>
+                <strong>{item.ok ? 'Hazır' : 'Eksik'} · {item.label}</strong>
+                <span>{item.detail}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         <label>Özet<textarea value={form.summary} onChange={(e) => setField('summary', e.target.value)} rows="2" /></label>
         <label>Kapak görseli URL<input value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} /></label>
         <label>Kapak görseli alt metni<input value={form.altCoverImage} onChange={(e) => setField('altCoverImage', e.target.value)} placeholder="Görsel erişilebilirlik açıklaması" /></label>

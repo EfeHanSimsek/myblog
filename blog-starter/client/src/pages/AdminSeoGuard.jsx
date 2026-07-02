@@ -181,7 +181,7 @@ export function AdminSeoGuard() {
                   <strong>{item.post.title || 'Başlıksız yazı'}</strong>
                   <span>{item.post.status} · {item.post.category || 'kategori yok'} · %{item.score} hazır</span>
                 </div>
-                <Link className="row-action" to={`/dashboard?edit=${item.post.id}`}>Editörde aç</Link>
+                <Link className="row-action" to={`/dashboard?edit=${item.post.id}&focus=seo`}>SEO eksiklerini düzelt</Link>
               </div>
 
               {item.status === 'ready' ? (

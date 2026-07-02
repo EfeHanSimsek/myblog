@@ -10,9 +10,13 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function countWords(value) {
+  return String(value || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
 function getPostQualityIssues(post) {
   const issues = [];
-  const wordCount = String(post.content || '').trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = countWords(post.content);
   const seoTitleLength = String(post.seoTitle || '').trim().length;
   const seoDescriptionLength = String(post.seoDescription || '').trim().length;
 
@@ -30,6 +34,42 @@ function getPostQualityIssues(post) {
   return issues;
 }
 
+function getCriticalSeoIssues(post) {
+  const issues = [];
+  const titleLength = String(post.title || '').trim().length;
+  const slugLength = String(post.slug || '').trim().length;
+  const seoTitleLength = String(post.seoTitle || '').trim().length;
+  const seoDescriptionLength = String(post.seoDescription || '').trim().length;
+
+  if (!titleLength) issues.push('başlık yok');
+  if (!slugLength || slugLength > 80) issues.push('slug kritik');
+  if (seoTitleLength < 30 || seoTitleLength > 70) issues.push('SEO başlığı kritik');
+  if (seoDescriptionLength < 90 || seoDescriptionLength > 160) issues.push('SEO açıklaması kritik');
+
+  return issues;
+}
+
+function getPublishSafety(post) {
+  const qualityIssues = getPostQualityIssues(post);
+  const criticalSeoIssues = getCriticalSeoIssues(post);
+  const score = Math.round(((10 - Math.min(qualityIssues.length, 10)) / 10) * 100);
+  const isPublished = post.status === 'published';
+  const publishedAt = post.publishedAt ? new Date(post.publishedAt).getTime() : 0;
+  const isFuturePublished = isPublished && publishedAt > Date.now();
+  const isReady = qualityIssues.length === 0 && criticalSeoIssues.length === 0;
+
+  return {
+    post,
+    score,
+    qualityIssues,
+    criticalSeoIssues,
+    isReady,
+    isPublished,
+    isFuturePublished,
+    status: criticalSeoIssues.length ? 'critical' : qualityIssues.length ? 'warning' : 'ready'
+  };
+}
+
 function getOverview(posts) {
   const now = Date.now();
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
@@ -38,19 +78,26 @@ function getOverview(posts) {
     .sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
   const dueSoon = scheduled.filter((post) => new Date(post.publishedAt).getTime() - now <= sevenDays);
   const datedDrafts = posts.filter((post) => post.status === 'draft' && post.publishedAt);
-  const riskyPosts = posts
-    .map((post) => ({ post, issues: getPostQualityIssues(post) }))
-    .filter((item) => item.issues.length)
-    .sort((a, b) => b.issues.length - a.issues.length);
+  const safety = posts.map(getPublishSafety);
+  const riskyPosts = safety
+    .filter((item) => item.qualityIssues.length)
+    .sort((a, b) => b.criticalSeoIssues.length - a.criticalSeoIssues.length || b.qualityIssues.length - a.qualityIssues.length || a.score - b.score);
+  const publishedBlockers = safety.filter((item) => item.isPublished && item.criticalSeoIssues.length);
+  const publishReadyDrafts = safety.filter((item) => item.post.status === 'draft' && item.isReady);
+  const criticalDrafts = safety.filter((item) => item.post.status === 'draft' && item.criticalSeoIssues.length);
 
   return {
     scheduled,
     dueSoon,
     datedDrafts,
     riskyPosts,
-    readyPosts: posts.filter((post) => getPostQualityIssues(post).length === 0).length,
+    readyPosts: safety.filter((item) => item.isReady).length,
+    publishedBlockers,
+    publishReadyDrafts,
+    criticalDrafts,
     nextPost: scheduled[0] || null,
-    topRisk: riskyPosts[0] || null
+    topRisk: riskyPosts[0] || null,
+    safety
   };
 }
 
@@ -126,10 +173,10 @@ export function DashboardOverview({ posts }) {
         <div className="quality-summary">
           <div><strong>{overview.readyPosts}</strong><span>Sorunsuz yazı</span></div>
           <div><strong>{overview.riskyPosts.length}</strong><span>Kontrol isteyen yazı</span></div>
-          <div><strong>{overview.topRisk?.issues.length || 0}</strong><span>En yüksek risk</span></div>
+          <div><strong>{overview.topRisk?.qualityIssues.length || 0}</strong><span>En yüksek risk</span></div>
         </div>
         {overview.topRisk ? (
-          <p className="notice">Öncelik: <strong>{overview.topRisk.post.title}</strong> — {overview.topRisk.issues.slice(0, 3).join(', ')}</p>
+          <p className="notice">Öncelik: <strong>{overview.topRisk.post.title}</strong> — {overview.topRisk.qualityIssues.slice(0, 3).join(', ')}</p>
         ) : (
           <p className="success">Tüm yazılar temel kalite kontrollerinden geçiyor.</p>
         )}
@@ -149,6 +196,25 @@ export function DashboardOverview({ posts }) {
           <p className="notice">Sıradaki yayın: <strong>{overview.nextPost.title}</strong> — {formatDateTime(overview.nextPost.publishedAt)}</p>
         ) : (
           <p className="notice">Henüz zamanlanmış yayın yok.</p>
+        )}
+      </article>
+
+      <article className="panel overview-card publish-safety-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Yayın Güvenliği</p><h2>Kritik SEO eşiği</h2></div>
+          <a className="row-action" href="/dashboard/seo-guard?filter=critical">Kritikleri aç</a>
+        </div>
+        <div className="quality-summary">
+          <div><strong>{overview.publishedBlockers.length}</strong><span>Yayında kritik</span></div>
+          <div><strong>{overview.criticalDrafts.length}</strong><span>Taslak kritik</span></div>
+          <div><strong>{overview.publishReadyDrafts.length}</strong><span>Hazır taslak</span></div>
+        </div>
+        {overview.publishedBlockers.length ? (
+          <p className="error">Yayındaki içeriklerde kritik SEO eksikleri var. Önce SEO Onarım panelindeki kritik filtreyi kapat.</p>
+        ) : overview.publishReadyDrafts.length ? (
+          <p className="success">Yayına alınabilecek taslak var. Son kontrol için kalite paneli ve takvim tarihini kontrol et.</p>
+        ) : (
+          <p className="notice">Yayın öncesi kritik SEO eşiği izleniyor; eksik yazılar onarım kuyruğunda tutuluyor.</p>
         )}
       </article>
 

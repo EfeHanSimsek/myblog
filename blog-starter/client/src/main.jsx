@@ -14,6 +14,7 @@ import { FilteredPosts } from './pages/FilteredPosts';
 import { NotFound } from './pages/NotFound';
 import { isAuthenticated } from './lib/api';
 import './styles.css';
+import './pages/DashboardSeoRepair.css';
 
 function ProtectedRoute({ children }) {
   const location = useLocation();

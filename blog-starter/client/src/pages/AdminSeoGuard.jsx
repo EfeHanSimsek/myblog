@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import './AdminSeoGuard.css';
 
@@ -88,22 +88,32 @@ function getPostGuard(post) {
   const checks = getSeoChecks(post);
   const missing = checks.filter((check) => !check.ok);
   const critical = missing.filter((check) => check.level === 'critical');
+  const warning = missing.filter((check) => check.level === 'warning');
   const score = Math.round(((checks.length - missing.length) / checks.length) * 100);
+  const isPublished = post.status === 'published';
+  const publishBlocked = isPublished && critical.length > 0;
+  const readyToPublish = post.status === 'draft' && missing.length === 0;
+  const priority = publishBlocked ? 4 : critical.length ? 3 : warning.length ? 2 : readyToPublish ? 1 : 0;
 
   return {
     post,
     checks,
     missing,
     critical,
+    warning,
     score,
+    publishBlocked,
+    readyToPublish,
+    priority,
     status: critical.length ? 'critical' : missing.length ? 'warning' : 'ready'
   };
 }
 
 export function AdminSeoGuard() {
+  const [searchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('needs-work');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('filter') || 'needs-work');
 
   useEffect(() => {
     api('/posts?includeDrafts=true')
@@ -111,14 +121,21 @@ export function AdminSeoGuard() {
       .catch((err) => setError(err.message));
   }, []);
 
+  useEffect(() => {
+    const filter = searchParams.get('filter');
+    if (filter) setStatusFilter(filter);
+  }, [searchParams]);
+
   const guards = useMemo(() => {
     return posts
       .map(getPostGuard)
-      .sort((a, b) => b.critical.length - a.critical.length || b.missing.length - a.missing.length || a.score - b.score);
+      .sort((a, b) => b.priority - a.priority || b.critical.length - a.critical.length || b.missing.length - a.missing.length || a.score - b.score);
   }, [posts]);
 
   const filteredGuards = useMemo(() => {
     if (statusFilter === 'critical') return guards.filter((item) => item.critical.length);
+    if (statusFilter === 'published-blockers') return guards.filter((item) => item.publishBlocked);
+    if (statusFilter === 'ready-to-publish') return guards.filter((item) => item.readyToPublish);
     if (statusFilter === 'ready') return guards.filter((item) => item.status === 'ready');
     if (statusFilter === 'published') return guards.filter((item) => item.post.status === 'published');
     if (statusFilter === 'draft') return guards.filter((item) => item.post.status === 'draft');
@@ -128,6 +145,9 @@ export function AdminSeoGuard() {
   const criticalCount = guards.filter((item) => item.critical.length).length;
   const warningCount = guards.filter((item) => item.status === 'warning').length;
   const readyCount = guards.filter((item) => item.status === 'ready').length;
+  const publishBlockedCount = guards.filter((item) => item.publishBlocked).length;
+  const readyToPublishCount = guards.filter((item) => item.readyToPublish).length;
+  const topPriority = guards[0];
 
   return (
     <section className="page stack seo-guard-page">
@@ -141,7 +161,9 @@ export function AdminSeoGuard() {
 
       <div className="stats">
         <div><strong>{criticalCount}</strong><span>Kritik yazı</span></div>
+        <div><strong>{publishBlockedCount}</strong><span>Yayında engel</span></div>
         <div><strong>{warningCount}</strong><span>Uyarı alan</span></div>
+        <div><strong>{readyToPublishCount}</strong><span>Yayına hazır taslak</span></div>
         <div><strong>{readyCount}</strong><span>Hazır</span></div>
         <div><strong>{posts.length}</strong><span>Toplam yazı</span></div>
       </div>
@@ -154,6 +176,13 @@ export function AdminSeoGuard() {
         <p>
           Bu panel yazıları kaydetmeden veya yayına almadan önce kritik SEO eksiklerini görünür yapar. Dış servis, ödeme, CDN veya mail hesabı gerektirmez; mevcut custom backend verisini okur.
         </p>
+        {topPriority && topPriority.status !== 'ready' && (
+          <div className={`seo-priority-callout seo-priority-${topPriority.status}`}>
+            <strong>İlk müdahale: {topPriority.post.title || 'Başlıksız yazı'}</strong>
+            <span>{topPriority.publishBlocked ? 'Yayındaki yazıda kritik SEO engeli var.' : `${topPriority.missing.length} eksik kontrol var.`}</span>
+            <Link className="row-action" to={`/dashboard?edit=${topPriority.post.id}&focus=seo`}>Öncelikli yazıyı aç</Link>
+          </div>
+        )}
       </div>
 
       <div className="panel">
@@ -164,7 +193,9 @@ export function AdminSeoGuard() {
           </div>
           <select className="compact-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="needs-work">Eksik olanlar</option>
+            <option value="published-blockers">Yayındaki kritikler</option>
             <option value="critical">Sadece kritik</option>
+            <option value="ready-to-publish">Yayına hazır taslaklar</option>
             <option value="published">Yayındaki yazılar</option>
             <option value="draft">Taslaklar</option>
             <option value="ready">Hazır olanlar</option>
@@ -181,7 +212,11 @@ export function AdminSeoGuard() {
                   <strong>{item.post.title || 'Başlıksız yazı'}</strong>
                   <span>{item.post.status} · {item.post.category || 'kategori yok'} · %{item.score} hazır</span>
                 </div>
-                <Link className="row-action" to={`/dashboard?edit=${item.post.id}&focus=seo`}>SEO eksiklerini düzelt</Link>
+                <div className="seo-guard-actions">
+                  {item.publishBlocked && <span className="seo-state-pill danger">Yayında kritik</span>}
+                  {item.readyToPublish && <span className="seo-state-pill success">Yayına hazır</span>}
+                  <Link className="row-action" to={`/dashboard?edit=${item.post.id}&focus=seo`}>SEO eksiklerini düzelt</Link>
+                </div>
               </div>
 
               {item.status === 'ready' ? (

@@ -7,9 +7,24 @@
   border-color: rgba(245, 158, 11, 0.28);
 }
 
+.production-queue-card {
+  border-color: rgba(14, 165, 233, 0.24);
+}
+
+.seo-priority-card {
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.workflow-card {
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
 .publish-safety-card .error,
 .publish-safety-card .success,
-.publish-safety-card .notice {
+.publish-safety-card .notice,
+.production-queue-card .notice,
+.seo-priority-card .success,
+.workflow-card .notice {
   margin-bottom: 0;
 }
 
@@ -40,6 +55,72 @@
   color: #d8dee9;
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.priority-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.priority-item {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  color: inherit;
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: 1fr auto;
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.priority-item:hover {
+  border-color: rgba(124, 58, 237, 0.34);
+  transform: translateY(-1px);
+}
+
+.priority-item strong,
+.priority-item span {
+  grid-column: 1;
+}
+
+.priority-item span {
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.priority-item em {
+  align-items: center;
+  background: #111827;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-style: normal;
+  font-weight: 800;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-content: center;
+  min-width: 3rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.priority-critical {
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.priority-warning {
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.compact-checklist {
+  gap: 0.5rem;
+}
+
+.compact-checklist li {
+  padding: 0.7rem 0.85rem;
 }
 
 .publishing-checklist {
@@ -89,6 +170,18 @@
 .backup-panel:target {
   border-color: #7c3aed;
   box-shadow: 0 20px 50px rgba(17, 24, 39, 0.06), 0 0 0 4px rgba(124, 58, 237, 0.14);
+}
+
+@media (max-width: 960px) {
+  .priority-item {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-item em {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 820px) {

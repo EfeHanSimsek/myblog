@@ -79,6 +79,11 @@ const quickActions = [
     detail: 'Yayın hazırlığını denetle'
   },
   {
+    href: '/dashboard/seo-guard',
+    label: 'SEO onarım',
+    detail: 'Kritik kayıt eksiklerini gör'
+  },
+  {
     href: '/dashboard/calendar',
     label: 'Takvim',
     detail: 'Yayın planını gör'
@@ -171,12 +176,12 @@ export function DashboardOverview({ posts }) {
       <article className="panel overview-card publishing-checklist-card">
         <div className="section-heading">
           <div><p className="eyebrow">İçerik Rehberi</p><h2>Yayın öncesi checklist</h2></div>
-          <a className="row-action" href="/dashboard/quality">Denetle</a>
+          <a className="row-action" href="/dashboard/seo-guard">SEO onarım</a>
         </div>
         <ol className="publishing-checklist">
           {publishingChecklist.map((item) => <li key={item}>{item}</li>)}
         </ol>
-        <p className="notice">Yeni haber veya blog yazısı eklerken önce bu listeyi, sonra kalite panelini kontrol et.</p>
+        <p className="notice">Yeni haber veya blog yazısı eklerken önce bu listeyi, sonra SEO onarım ve kalite panelini kontrol et.</p>
       </article>
     </div>
   );

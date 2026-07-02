@@ -55,6 +55,75 @@ function toDatetimeLocal(value) {
   return local.toISOString().slice(0, 16);
 }
 
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+function getPlanningWarning(form) {
+  if (!form.publishedAt) {
+    if (form.status === 'published') {
+      return {
+        type: 'notice',
+        title: 'Anında yayın',
+        text: 'Yayın tarihi boş bırakılırsa kayıt sırasında sunucu bu yazıyı hemen yayına alır.'
+      };
+    }
+
+    return {
+      type: 'muted',
+      title: 'Taslak kuyruğu',
+      text: 'Yayın tarihi olmayan taslaklar takvimde plansız içerik olarak kalır.'
+    };
+  }
+
+  const selectedDate = new Date(form.publishedAt);
+  if (Number.isNaN(selectedDate.getTime())) {
+    return {
+      type: 'critical',
+      title: 'Geçersiz tarih',
+      text: 'Yayın tarihi okunamıyor. Kaydetmeden önce tarih alanını temizle veya yeniden seç.'
+    };
+  }
+
+  const isFuture = selectedDate.getTime() > Date.now();
+  const readableDate = formatDateTime(selectedDate);
+
+  if (form.status === 'published' && isFuture) {
+    return {
+      type: 'warning',
+      title: 'Zamanlanmış yayın',
+      text: `Bu yazı ${readableDate} için planlanmış yayın olarak kaydedilecek.`
+    };
+  }
+
+  if (form.status === 'published') {
+    return {
+      type: 'notice',
+      title: 'Yayında görünecek',
+      text: `Bu yazı ${readableDate} tarihiyle yayında görünecek.`
+    };
+  }
+
+  if (isFuture) {
+    return {
+      type: 'warning',
+      title: 'Tarihli taslak',
+      text: `Bu içerik taslak kalacak, ama takvimde ${readableDate} tarihli plan olarak görünecek.`
+    };
+  }
+
+  return {
+    type: 'muted',
+    title: 'Geçmiş tarihli taslak',
+    text: `Taslak geçmiş bir tarih taşıyor: ${readableDate}. Yayına almadan önce tarihi kontrol et.`
+  };
+}
+
 function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -132,6 +201,8 @@ export function Dashboard() {
     });
   }, [media, mediaQuery, mediaTypeFilter]);
 
+  const planningWarning = useMemo(() => getPlanningWarning(form), [form]);
+
   function setField(name, value) {
     setForm((current) => {
       if (name === 'title') {
@@ -200,6 +271,12 @@ export function Dashboard() {
     event.preventDefault();
     setError('');
     setMessage('');
+
+    if (form.publishedAt && Number.isNaN(new Date(form.publishedAt).getTime())) {
+      setError('Yayın tarihi geçersiz. Lütfen tarihi temizle veya yeniden seç.');
+      return;
+    }
+
     setIsSaving(true);
 
     const payload = {
@@ -343,6 +420,7 @@ export function Dashboard() {
         <label>SEO Başlığı<input value={form.seoTitle} onChange={(e) => setField('seoTitle', e.target.value.slice(0, 70))} maxLength="70" placeholder="Arama motorlarında görünecek başlık" /><span className="field-hint">{form.seoTitle.length}/70 karakter</span></label>
         <label>SEO Açıklaması<textarea value={form.seoDescription} onChange={(e) => setField('seoDescription', e.target.value.slice(0, 160))} rows="2" maxLength="160" placeholder="Arama motorlarında görünecek açıklama" /><span className="field-hint">{form.seoDescription.length}/160 karakter</span></label>
         <label>Yayın Tarihi<input type="datetime-local" value={form.publishedAt} onChange={(e) => setField('publishedAt', e.target.value)} /><span className="field-hint">Boş bırakılırsa yayın sırasında otomatik atanır.</span></label>
+        {planningWarning && <div className={`planning-hint planning-${planningWarning.type}`}><strong>{planningWarning.title}</strong><span>{planningWarning.text}</span></div>}
         <label>Özet<textarea value={form.summary} onChange={(e) => setField('summary', e.target.value)} rows="2" /></label>
         <label>Kapak görseli URL<input value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} /></label>
         <label>Kapak görseli alt metni<input value={form.altCoverImage} onChange={(e) => setField('altCoverImage', e.target.value)} placeholder="Görsel erişilebilirlik açıklaması" /></label>

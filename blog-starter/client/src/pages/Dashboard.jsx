@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { DashboardOverview } from '../components/DashboardOverview';
 import { api } from '../lib/api';
 
 const emptyForm = {
@@ -407,6 +408,8 @@ export function Dashboard() {
           <div><strong>{stats.approvedComments || 0}</strong><span>Onaylı yorum</span></div>
         </div>
       )}
+
+      <DashboardOverview posts={posts} />
 
       <div className="panel backup-panel">
         <div className="section-heading">

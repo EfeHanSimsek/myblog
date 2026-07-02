@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { AdminOps } from './pages/AdminOps';
 import { AdminQuality } from './pages/AdminQuality';
 import { AdminCalendar } from './pages/AdminCalendar';
+import { AdminSeoGuard } from './pages/AdminSeoGuard';
 import { FilteredPosts } from './pages/FilteredPosts';
 import { NotFound } from './pages/NotFound';
 import { isAuthenticated } from './lib/api';
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
       { path: 'dashboard/calendar', element: <ProtectedRoute><AdminCalendar /></ProtectedRoute> },
       { path: 'dashboard/quality', element: <ProtectedRoute><AdminQuality /></ProtectedRoute> },
+      { path: 'dashboard/seo-guard', element: <ProtectedRoute><AdminSeoGuard /></ProtectedRoute> },
       { path: 'dashboard/system', element: <ProtectedRoute><AdminOps /></ProtectedRoute> },
       { path: '*', element: <NotFound /> }
     ]

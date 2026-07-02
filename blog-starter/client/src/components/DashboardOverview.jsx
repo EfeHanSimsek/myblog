@@ -90,6 +90,14 @@ const quickActions = [
   }
 ];
 
+const publishingChecklist = [
+  'Başlık, slug ve kategori net mi?',
+  'Özet ve SEO açıklaması özgün mü?',
+  'Kapak görseli ile alt metin dolu mu?',
+  'Kaynak, etiket ve yayın tarihi kontrol edildi mi?',
+  'Yayınlamadan önce kalite panelinde kritik uyarı kalmadı mı?'
+];
+
 function scrollToDashboardSection(event, selector) {
   if (!selector || window.location.pathname !== '/dashboard') return;
 
@@ -158,6 +166,17 @@ export function DashboardOverview({ posts }) {
           ))}
         </div>
         <p className="notice">Kısayollar artık doğrudan ilgili admin alanına yönlenir; yerel testte form state'ini değiştirmeden güvenli anchor geçişi sağlar.</p>
+      </article>
+
+      <article className="panel overview-card publishing-checklist-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">İçerik Rehberi</p><h2>Yayın öncesi checklist</h2></div>
+          <a className="row-action" href="/dashboard/quality">Denetle</a>
+        </div>
+        <ol className="publishing-checklist">
+          {publishingChecklist.map((item) => <li key={item}>{item}</li>)}
+        </ol>
+        <p className="notice">Yeni haber veya blog yazısı eklerken önce bu listeyi, sonra kalite panelini kontrol et.</p>
       </article>
     </div>
   );

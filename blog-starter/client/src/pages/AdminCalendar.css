@@ -1,0 +1,148 @@
+.planning-panel {
+  border-color: #d7d2c6;
+}
+
+.planning-warnings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+}
+
+.planning-warning {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1rem;
+  display: grid;
+  gap: .35rem;
+  background: #fbfbf8;
+}
+
+.planning-warning p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.planning-critical {
+  border-color: #f4b4ae;
+  background: #fff4f2;
+}
+
+.planning-notice {
+  border-color: #c7d2fe;
+  background: #f5f7ff;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.calendar-weekdays span {
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.calendar-day {
+  min-height: 132px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  padding: .75rem;
+  display: grid;
+  align-content: start;
+  gap: .6rem;
+}
+
+.calendar-day.is-outside {
+  opacity: .55;
+  background: #fbfbf8;
+}
+
+.calendar-day.is-today {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.calendar-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.calendar-day-head span,
+.calendar-more {
+  border-radius: 999px;
+  background: #f2f2ee;
+  color: var(--muted);
+  padding: .18rem .45rem;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.calendar-items {
+  display: grid;
+  gap: .35rem;
+}
+
+.calendar-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .45rem;
+  display: grid;
+  gap: .15rem;
+  background: #fbfbf8;
+}
+
+.calendar-item span {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.calendar-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .78rem;
+}
+
+.calendar-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .planning-warnings,
+  .calendar-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-weekdays {
+    display: none;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day {
+    min-height: auto;
+  }
+}

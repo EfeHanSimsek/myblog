@@ -56,16 +56,19 @@ function getOverview(posts) {
 const quickActions = [
   {
     href: '/dashboard#editor',
+    selector: '.editor',
     label: 'Yeni yazı',
     detail: 'Editör formuna git'
   },
   {
     href: '/dashboard#media-library',
+    selector: '.media-library',
     label: 'Medya ekle',
     detail: 'Medya kütüphanesine git'
   },
   {
     href: '/dashboard#backup',
+    selector: '.backup-panel',
     label: 'Yedek indir',
     detail: 'JSON yedek alanına git'
   },
@@ -85,6 +88,16 @@ const quickActions = [
     detail: 'Sağlık ve import alanı'
   }
 ];
+
+function scrollToDashboardSection(event, selector) {
+  if (!selector || window.location.pathname !== '/dashboard') return;
+
+  const target = document.querySelector(selector);
+  if (!target) return;
+
+  event.preventDefault();
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 export function DashboardOverview({ posts }) {
   const overview = getOverview(posts || []);
@@ -132,7 +145,12 @@ export function DashboardOverview({ posts }) {
         </div>
         <div className="quick-actions-grid">
           {quickActions.map((action) => (
-            <a className="button-link quick-action-link" href={action.href} key={action.href}>
+            <a
+              className="button-link quick-action-link"
+              href={action.href}
+              key={action.href}
+              onClick={(event) => scrollToDashboardSection(event, action.selector)}
+            >
               <strong>{action.label}</strong>
               <span>{action.detail}</span>
             </a>

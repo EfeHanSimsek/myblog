@@ -83,6 +83,32 @@
   overflow-wrap: anywhere;
 }
 
+.batch-log-row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.batch-log-row-actions button {
+  padding: 0.5rem 0.75rem;
+}
+
+.batch-rollback-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.batch-rollback-note.ready {
+  color: #166534;
+}
+
+.batch-rollback-note.locked {
+  color: #92400e;
+}
+
 .batch-seo-grid {
   display: grid;
   gap: 1rem;

@@ -19,12 +19,27 @@
   border-color: rgba(34, 197, 94, 0.22);
 }
 
+.decision-board-card {
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.schedule-risk-card {
+  border-color: rgba(59, 130, 246, 0.24);
+}
+
+.batch-repair-card {
+  border-color: rgba(168, 85, 247, 0.24);
+}
+
 .publish-safety-card .error,
 .publish-safety-card .success,
 .publish-safety-card .notice,
 .production-queue-card .notice,
 .seo-priority-card .success,
-.workflow-card .notice {
+.workflow-card .notice,
+.decision-board-card .notice,
+.schedule-risk-card .notice,
+.batch-repair-card .success {
   margin-bottom: 0;
 }
 
@@ -62,6 +77,10 @@
   gap: 0.75rem;
 }
 
+.compact-priority-list {
+  gap: 0.55rem;
+}
+
 .priority-item {
   align-items: center;
   background: rgba(15, 23, 42, 0.04);
@@ -74,6 +93,10 @@
   padding: 0.9rem 1rem;
   text-decoration: none;
   transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.compact-priority-list .priority-item {
+  padding: 0.75rem 0.85rem;
 }
 
 .priority-item:hover {
@@ -113,6 +136,11 @@
 
 .priority-warning {
   border-color: rgba(245, 158, 11, 0.22);
+}
+
+.priority-ready {
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(16, 185, 129, 0.06);
 }
 
 .compact-checklist {

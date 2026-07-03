@@ -66,7 +66,8 @@
 }
 
 .seo-audit-field-summary,
-.seo-audit-export-actions {
+.seo-audit-export-actions,
+.seo-audit-result-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -139,6 +140,90 @@
   line-height: 1.45;
 }
 
+.seo-audit-result-panel {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 20px;
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.seo-audit-result-panel h3 {
+  margin: 0.1rem 0 0;
+}
+
+.compact-result-note {
+  margin: 0;
+}
+
+.seo-audit-result-pill {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
+.seo-audit-result-pill.result-restored {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.26);
+}
+
+.seo-audit-result-pill.result-skipped,
+.seo-audit-result-pill.result-missing,
+.seo-audit-result-pill.result-invalid,
+.seo-audit-result-pill.result-error {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.seo-audit-result-pill.result-empty {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.seo-audit-result-columns {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seo-audit-result-box {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem;
+}
+
+.seo-audit-result-box.success-box {
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.seo-audit-result-box.warning-box {
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.seo-audit-result-box article {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem;
+}
+
+.seo-audit-result-box article span,
+.seo-audit-result-box article em {
+  display: block;
+}
+
+.seo-audit-result-box article em {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: normal;
+}
+
 .danger-action {
   background: rgba(220, 38, 38, 0.92);
   border: 0;
@@ -157,7 +242,8 @@
 
 @media (max-width: 900px) {
   .seo-audit-stats,
-  .seo-audit-layout {
+  .seo-audit-layout,
+  .seo-audit-result-columns {
     grid-template-columns: 1fr;
   }
 

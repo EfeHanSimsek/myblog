@@ -11,6 +11,7 @@ import { AdminQuality } from './pages/AdminQuality';
 import { AdminCalendar } from './pages/AdminCalendar';
 import { AdminSeoGuard } from './pages/AdminSeoGuard';
 import { AdminBatchSeoRepair } from './pages/AdminBatchSeoRepair';
+import { AdminSeoRepairAudit } from './pages/AdminSeoRepairAudit';
 import { FilteredPosts } from './pages/FilteredPosts';
 import { NotFound } from './pages/NotFound';
 import { isAuthenticated } from './lib/api';
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
       { path: 'dashboard/quality', element: <ProtectedRoute><AdminQuality /></ProtectedRoute> },
       { path: 'dashboard/seo-guard', element: <ProtectedRoute><AdminSeoGuard /></ProtectedRoute> },
       { path: 'dashboard/batch-seo-repair', element: <ProtectedRoute><AdminBatchSeoRepair /></ProtectedRoute> },
+      { path: 'dashboard/seo-repair-audit', element: <ProtectedRoute><AdminSeoRepairAudit /></ProtectedRoute> },
       { path: 'dashboard/system', element: <ProtectedRoute><AdminOps /></ProtectedRoute> },
       { path: '*', element: <NotFound /> }
     ]

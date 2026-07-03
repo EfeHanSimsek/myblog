@@ -4,7 +4,12 @@ import { api } from '../lib/api';
 import './AdminSeoRepairAudit.css';
 
 const FIELD_LABELS = {
-  slug: 'Slug', summary: 'Özet', seoTitle: 'SEO başlığı', seoDescription: 'SEO açıklaması', altCoverImage: 'Kapak alt metni', tags: 'Etiketler'
+  slug: 'Slug',
+  summary: 'Özet',
+  seoTitle: 'SEO başlığı',
+  seoDescription: 'SEO açıklaması',
+  altCoverImage: 'Kapak alt metni',
+  tags: 'Etiketler'
 };
 
 function formatDate(value) {
@@ -72,6 +77,7 @@ export function AdminSeoRepairAudit() {
   const [fieldFilter, setFieldFilter] = useState('all');
   const [selectedLogId, setSelectedLogId] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+  const [isRollingBack, setIsRollingBack] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -79,6 +85,11 @@ export function AdminSeoRepairAudit() {
     setError('');
     const data = await api('/seo-repair/logs');
     setLogs(data.logs || []);
+  }
+
+  async function loadLogDetail(id) {
+    const data = await api(`/seo-repair/logs/${id}`);
+    setSelectedLog(data.log || null);
   }
 
   useEffect(() => { loadLogs().catch((err) => setError(err.message)); }, []);
@@ -109,15 +120,39 @@ export function AdminSeoRepairAudit() {
   }), [filteredLogs, logs]);
 
   const preview = useMemo(() => previewFrom(selectedLog), [selectedLog]);
+  const canRollback = Boolean(selectedLog && preview.rollbackRisk === 'safe' && !isRollingBack);
 
   async function openLog(log) {
     setNotice('');
+    setError('');
     if (selectedLogId === log.id && selectedLog) { setSelectedLogId(''); setSelectedLog(null); return; }
     setSelectedLogId(log.id);
+    try { await loadLogDetail(log.id); } catch (err) { setError(err.message); }
+  }
+
+  async function rollbackSelectedLog() {
+    if (!selectedLog || preview.rollbackRisk !== 'safe') {
+      setError('Geri alma için önce previousValues taşıyan, geri alınmamış bir log seç.');
+      return;
+    }
+    const affectedPosts = preview.rows.length;
+    const affectedFields = Object.values(preview.fieldTotals).reduce((a, b) => a + b, 0);
+    const confirmed = window.confirm(`${affectedPosts} yazıda ${affectedFields} SEO alanı eski değerlerine döndürülecek. Bu işlem yayın durumunu değiştirmez. Devam edilsin mi?`);
+    if (!confirmed) return;
+    setIsRollingBack(true);
+    setNotice('');
+    setError('');
     try {
-      const data = await api(`/seo-repair/logs/${log.id}`);
-      setSelectedLog(data.log || null);
-    } catch (err) { setError(err.message); }
+      const data = await api(`/seo-repair/logs/${selectedLog.id}/rollback`, { method: 'POST' });
+      await loadLogs();
+      await loadLogDetail(selectedLog.id);
+      const restored = data.rollbackResults?.filter((item) => item.status === 'rolled_back').length || 0;
+      setNotice(`Rollback tamamlandı. Geri alınan yazı: ${restored}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsRollingBack(false);
+    }
   }
 
   function exportSelectedCsv() {
@@ -167,12 +202,12 @@ export function AdminSeoRepairAudit() {
 
   return (
     <section className="page stack seo-audit-page">
-      <div className="section-heading"><div><p className="eyebrow">SEO işlem denetimi</p><h1>Log arama, filtreleme ve güvenli önizleme</h1></div><div className="actions compact-actions"><Link className="row-action" to="/dashboard/batch-seo-repair">Toplu SEO</Link><Link className="row-action" to="/dashboard/seo-guard">SEO Onarım</Link><Link className="row-action" to="/dashboard">Editör</Link></div></div>
+      <div className="section-heading"><div><p className="eyebrow">SEO işlem denetimi</p><h1>Log arama, filtreleme ve güvenli rollback</h1></div><div className="actions compact-actions"><Link className="row-action" to="/dashboard/batch-seo-repair">Toplu SEO</Link><Link className="row-action" to="/dashboard/seo-guard">SEO Onarım</Link><Link className="row-action" to="/dashboard">Editör</Link></div></div>
       <div className="stats seo-audit-stats"><div><strong>{totals.ready}</strong><span>Hazır log</span></div><div><strong>{totals.done}</strong><span>Geri alınmış</span></div><div><strong>{totals.legacy}</strong><span>Eski/verisiz</span></div><div><strong>{totals.visible}</strong><span>Filtre sonucu</span></div><div><strong>{totals.exportedFields}</strong><span>Görünen alan değişimi</span></div><div><strong>{totals.total}</strong><span>Toplam log</span></div></div>
-      <div className="panel seo-audit-filter-panel"><div><p className="eyebrow">Kontrollü denetim</p><h2>Logları daralt ve etkiyi incele</h2><p className="notice">Bu sayfa sadece okuma, önizleme ve tarayıcı içi dışa aktarma yapar; yazı içeriği, yayın durumu veya SEO alanlarını değiştirmez.</p></div><div className="seo-audit-toolbar"><label>Arama<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Log ID, tarih veya alan ara" /></label><label>Durum<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tümü</option><option value="ready">Hazır</option><option value="done">Geri alınmış</option><option value="legacy">Eski / verisiz</option></select></label><label>Alan<select value={fieldFilter} onChange={(event) => setFieldFilter(event.target.value)}><option value="all">Tüm alanlar</option>{fields.map((field) => <option value={field} key={field}>{FIELD_LABELS[field] || field}</option>)}</select></label><button type="button" onClick={() => { setQuery(''); setStatusFilter('all'); setFieldFilter('all'); }}>Temizle</button><button type="button" onClick={() => loadLogs().catch((err) => setError(err.message))}>Yenile</button><button type="button" onClick={exportVisibleSummary}>Görünen özeti indir</button></div></div>
+      <div className="panel seo-audit-filter-panel"><div><p className="eyebrow">Kontrollü denetim</p><h2>Logları daralt ve etkiyi incele</h2><p className="notice">Bu sayfa okuma, önizleme, dışa aktarma ve seçili log için kontrollü rollback yapar. Rollback sadece previousValues taşıyan yeni loglarda aktif olur.</p></div><div className="seo-audit-toolbar"><label>Arama<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Log ID, tarih veya alan ara" /></label><label>Durum<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tümü</option><option value="ready">Hazır</option><option value="done">Geri alınmış</option><option value="legacy">Eski / verisiz</option></select></label><label>Alan<select value={fieldFilter} onChange={(event) => setFieldFilter(event.target.value)}><option value="all">Tüm alanlar</option>{fields.map((field) => <option value={field} key={field}>{FIELD_LABELS[field] || field}</option>)}</select></label><button type="button" onClick={() => { setQuery(''); setStatusFilter('all'); setFieldFilter('all'); }}>Temizle</button><button type="button" onClick={() => loadLogs().catch((err) => setError(err.message))}>Yenile</button><button type="button" onClick={exportVisibleSummary}>Görünen özeti indir</button></div></div>
       {notice && <p className="success">{notice}</p>}
       {error && <p className="error">{error}</p>}
-      <div className="seo-audit-layout"><div className="panel seo-audit-log-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">İşlem geçmişi</p><h2>Filtrelenmiş loglar</h2></div></div><div className="seo-audit-log-list">{filteredLogs.map((log) => { const state = statusOf(log); return <button className={`seo-audit-log-row ${selectedLogId === log.id ? 'active' : ''}`} type="button" onClick={() => openLog(log)} key={log.id}><strong>{formatDate(log.createdAt)}</strong><span>{log.repairedCount} onarıldı · {log.skippedCount} atlandı · {log.changedFieldCount} alan değişti</span><em className={`batch-rollback-note ${state.className}`}>{state.label}</em></button>; })}{!filteredLogs.length && <p className="notice">Bu filtrelerle eşleşen log yok.</p>}</div></div><div className="panel seo-audit-preview-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">Önizleme</p><h2>{selectedLog ? `${formatDate(selectedLog.createdAt)} işlem etkisi` : 'Log seç'}</h2></div></div>{!selectedLog && <p className="notice">Sol listeden bir log seçince eski/yeni SEO değerleri burada görünür.</p>}{selectedLog && <><div className={`seo-audit-safety-banner seo-audit-safety-${preview.rollbackRisk}`}><strong>{preview.rollbackRisk === 'safe' ? 'Geri alma önizlemesi güvenli' : preview.rollbackRisk === 'done' ? 'Bu işlem daha önce geri alınmış' : 'Geri alma verisi yok veya eksik'}</strong><span>{preview.rollbackRisk === 'safe' ? 'Bu log eski/yeni değerleri taşıyor; geri alma öncesi alan etkisi aşağıda incelenebilir.' : preview.rollbackRisk === 'done' ? 'Tekrar geri alma yerine detay kayıtları denetim amacıyla görüntülenir.' : 'Eski loglarda previousValues bulunmadığı için sadece özet denetim yapılabilir.'}</span></div><div className="batch-report-grid seo-audit-preview-grid"><div><strong>{preview.rows.length}</strong><span>Etkilenen yazı</span></div><div><strong>{Object.values(preview.fieldTotals).reduce((a, b) => a + b, 0)}</strong><span>Alan değişimi</span></div><div><strong>{preview.skippedRows.length}</strong><span>Atlanan kayıt</span></div><div><strong>{selectedLog.rollbackResults?.length || 0}</strong><span>Geri alma sonucu</span></div></div><div className="seo-audit-export-actions"><button type="button" onClick={exportSelectedCsv}>CSV indir</button><button type="button" onClick={exportSelectedJson}>JSON indir</button><button type="button" onClick={copySelectedSummary}>Özeti kopyala</button></div><div className="seo-audit-field-summary">{Object.entries(preview.fieldTotals).map(([field, count]) => <span className="seo-state-pill neutral" key={field}>{FIELD_LABELS[field] || field}: {count}</span>)}{!Object.keys(preview.fieldTotals).length && <p className="notice">Bu logda alan bazlı değişiklik önizlemesi yok.</p>}</div>{preview.hiddenRows > 0 && <p className="notice">Performans için ilk 10 yazı gösteriliyor. Tüm kayıtları CSV/JSON dışa aktarma ile incele. Gizlenen yazı: {preview.hiddenRows}</p>}<div className="seo-audit-diff-list">{preview.rows.slice(0, 10).map((item) => <article className="batch-diff-card" key={`${selectedLog.id}-${item.id}`}><div className="batch-diff-card-head"><div><strong>{item.title || item.id}</strong><span>{(item.changedFields || []).length} alan işlem kapsamında</span></div><Link className="row-action" to={`/dashboard?edit=${item.id}&focus=seo`}>Editörde aç</Link></div><div className="batch-diff-table">{(item.changedFields || []).map((field) => <div className="batch-diff-row" key={`${item.id}-${field}`}><strong>{FIELD_LABELS[field] || field}</strong><div><span>Eski değer</span><p>{formatValue(item.previousValues?.[field])}</p></div><div><span>Yeni değer</span><p>{formatValue(item.nextValues?.[field])}</p></div></div>)}</div></article>)}</div></>}</div></div>
+      <div className="seo-audit-layout"><div className="panel seo-audit-log-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">İşlem geçmişi</p><h2>Filtrelenmiş loglar</h2></div></div><div className="seo-audit-log-list">{filteredLogs.map((log) => { const state = statusOf(log); return <button className={`seo-audit-log-row ${selectedLogId === log.id ? 'active' : ''}`} type="button" onClick={() => openLog(log)} key={log.id}><strong>{formatDate(log.createdAt)}</strong><span>{log.repairedCount} onarıldı · {log.skippedCount} atlandı · {log.changedFieldCount} alan değişti</span><em className={`batch-rollback-note ${state.className}`}>{state.label}</em></button>; })}{!filteredLogs.length && <p className="notice">Bu filtrelerle eşleşen log yok.</p>}</div></div><div className="panel seo-audit-preview-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">Önizleme</p><h2>{selectedLog ? `${formatDate(selectedLog.createdAt)} işlem etkisi` : 'Log seç'}</h2></div></div>{!selectedLog && <p className="notice">Sol listeden bir log seçince eski/yeni SEO değerleri burada görünür.</p>}{selectedLog && <><div className={`seo-audit-safety-banner seo-audit-safety-${preview.rollbackRisk}`}><strong>{preview.rollbackRisk === 'safe' ? 'Geri alma önizlemesi güvenli' : preview.rollbackRisk === 'done' ? 'Bu işlem daha önce geri alınmış' : 'Geri alma verisi yok veya eksik'}</strong><span>{preview.rollbackRisk === 'safe' ? 'Bu log eski/yeni değerleri taşıyor; rollback butonu yalnızca bu durumda aktiftir.' : preview.rollbackRisk === 'done' ? 'Tekrar geri alma yerine detay kayıtları denetim amacıyla görüntülenir.' : 'Eski loglarda previousValues bulunmadığı için sadece özet denetim yapılabilir.'}</span></div><div className="batch-report-grid seo-audit-preview-grid"><div><strong>{preview.rows.length}</strong><span>Etkilenen yazı</span></div><div><strong>{Object.values(preview.fieldTotals).reduce((a, b) => a + b, 0)}</strong><span>Alan değişimi</span></div><div><strong>{preview.skippedRows.length}</strong><span>Atlanan kayıt</span></div><div><strong>{selectedLog.rollbackResults?.length || 0}</strong><span>Geri alma sonucu</span></div></div><div className="seo-audit-rollback-panel"><div><strong>Rollback önizlemesi</strong><span>İşlem yayın durumunu değiştirmeden sadece logdaki eski SEO metadata değerlerini geri yazar.</span></div><button type="button" className="danger-action" onClick={rollbackSelectedLog} disabled={!canRollback}>{isRollingBack ? 'Geri alınıyor...' : 'Bu logu geri al'}</button></div><div className="seo-audit-export-actions"><button type="button" onClick={exportSelectedCsv}>CSV indir</button><button type="button" onClick={exportSelectedJson}>JSON indir</button><button type="button" onClick={copySelectedSummary}>Özeti kopyala</button></div><div className="seo-audit-field-summary">{Object.entries(preview.fieldTotals).map(([field, count]) => <span className="seo-state-pill neutral" key={field}>{FIELD_LABELS[field] || field}: {count}</span>)}{!Object.keys(preview.fieldTotals).length && <p className="notice">Bu logda alan bazlı değişiklik önizlemesi yok.</p>}</div>{preview.hiddenRows > 0 && <p className="notice">Performans için ilk 10 yazı gösteriliyor. Tüm kayıtları CSV/JSON dışa aktarma ile incele. Gizlenen yazı: {preview.hiddenRows}</p>}<div className="seo-audit-diff-list">{preview.rows.slice(0, 10).map((item) => <article className="batch-diff-card" key={`${selectedLog.id}-${item.id}`}><div className="batch-diff-card-head"><div><strong>{item.title || item.id}</strong><span>{(item.changedFields || []).length} alan işlem kapsamında</span></div><Link className="row-action" to={`/dashboard?edit=${item.id}&focus=seo`}>Editörde aç</Link></div><div className="batch-diff-table">{(item.changedFields || []).map((field) => <div className="batch-diff-row" key={`${item.id}-${field}`}><strong>{FIELD_LABELS[field] || field}</strong><div><span>Eski değer</span><p>{formatValue(item.previousValues?.[field])}</p></div><div><span>Yeni değer</span><p>{formatValue(item.nextValues?.[field])}</p></div></div>)}</div></article>)}</div></>}</div></div>
     </section>
   );
 }

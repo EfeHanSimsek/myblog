@@ -19,7 +19,8 @@
 }
 
 .batch-report-panel,
-.batch-history-panel {
+.batch-history-panel,
+.batch-detail-panel {
   display: grid;
   gap: 1rem;
 }
@@ -57,12 +58,20 @@
   margin-top: 0.2rem;
 }
 
-.batch-log-list {
+.batch-field-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.batch-log-list,
+.batch-diff-list {
   display: grid;
   gap: 0.65rem;
 }
 
-.batch-log-row {
+.batch-log-row,
+.batch-diff-card {
   align-items: start;
   background: rgba(255, 255, 255, 0.74);
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -83,12 +92,28 @@
   overflow-wrap: anywhere;
 }
 
-.batch-log-row-actions {
+.batch-log-row-actions,
+.batch-diff-card-head {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.35rem;
+}
+
+.batch-diff-card-head {
+  justify-content: space-between;
+}
+
+.batch-diff-card-head strong,
+.batch-diff-card-head span {
+  display: block;
+}
+
+.batch-diff-card-head span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
 }
 
 .batch-log-row-actions button {
@@ -107,6 +132,49 @@
 
 .batch-rollback-note.locked {
   color: #92400e;
+}
+
+.batch-diff-table {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.batch-diff-row {
+  background: rgba(15, 23, 42, 0.025);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: minmax(110px, 0.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  padding: 0.75rem;
+}
+
+.batch-diff-row strong,
+.batch-diff-row span,
+.batch-diff-row p {
+  display: block;
+}
+
+.batch-diff-row strong {
+  color: #111827;
+  font-size: 0.88rem;
+}
+
+.batch-diff-row span {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
+.batch-diff-row p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .batch-seo-grid {
@@ -224,11 +292,13 @@
   .batch-seo-page .stats,
   .batch-report-grid,
   .batch-seo-card-head,
-  .batch-seo-columns {
+  .batch-seo-columns,
+  .batch-diff-row {
     grid-template-columns: 1fr;
   }
 
-  .batch-seo-card-head .row-action {
+  .batch-seo-card-head .row-action,
+  .batch-diff-card-head .row-action {
     justify-self: start;
   }
 }

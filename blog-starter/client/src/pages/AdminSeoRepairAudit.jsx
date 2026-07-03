@@ -40,6 +40,18 @@ function rollbackLabel(status) {
   return ROLLBACK_STATUS_LABELS[status] || status || 'Bilinmiyor';
 }
 
+function toDateStart(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toDateEnd(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function previewFrom(log) {
   const rows = (log?.results || []).filter((item) => item.status === 'repaired' && item.previousValues);
   const fieldTotals = rows.reduce((acc, item) => {
@@ -102,11 +114,26 @@ function buildCsv(log, rows) {
   return [header, ...body].map((row) => row.map(csvEscape).join(',')).join('\n');
 }
 
+function buildRollbackCsv(log, rollbackResults) {
+  const header = ['logId', 'rolledBackAt', 'postId', 'title', 'status', 'reason'];
+  const body = rollbackResults.map((item) => [
+    log.id,
+    log.rolledBackAt || '',
+    item.id || item.postId || '',
+    item.title || item.postTitle || item.id || item.postId || '',
+    rollbackLabel(item.status),
+    item.reason || ''
+  ]);
+  return [header, ...body].map((row) => row.map(csvEscape).join(',')).join('\n');
+}
+
 export function AdminSeoRepairAudit() {
   const [logs, setLogs] = useState([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [fieldFilter, setFieldFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedLogId, setSelectedLogId] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
   const [lastRollbackReport, setLastRollbackReport] = useState(null);
@@ -137,15 +164,21 @@ export function AdminSeoRepairAudit() {
 
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('tr-TR');
+    const minDate = toDateStart(startDate);
+    const maxDate = toDateEnd(endDate);
     return logs.filter((log) => {
+      const createdAt = log.createdAt ? new Date(log.createdAt) : null;
+      const createdTime = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : null;
       const state = statusOf(log).key;
       const fieldText = Object.keys(log.changedFieldSummary || {}).map((field) => FIELD_LABELS[field] || field).join(' ');
       const text = [log.id, log.createdAt, fieldText].join(' ').toLocaleLowerCase('tr-TR');
       return (statusFilter === 'all' || statusFilter === state)
         && (fieldFilter === 'all' || Boolean(log.changedFieldSummary?.[fieldFilter]))
+        && (!minDate || (createdTime && createdTime >= minDate.getTime()))
+        && (!maxDate || (createdTime && createdTime <= maxDate.getTime()))
         && (!q || text.includes(q));
     });
-  }, [fieldFilter, logs, query, statusFilter]);
+  }, [endDate, fieldFilter, logs, query, startDate, statusFilter]);
 
   const totals = useMemo(() => ({
     ready: logs.filter((log) => statusOf(log).key === 'ready').length,
@@ -156,6 +189,7 @@ export function AdminSeoRepairAudit() {
     exportedFields: filteredLogs.reduce((total, log) => total + Number(log.changedFieldCount || 0), 0)
   }), [filteredLogs, logs]);
 
+  const activeDateRange = Boolean(startDate || endDate);
   const preview = useMemo(() => previewFrom(selectedLog), [selectedLog]);
   const canRollback = Boolean(selectedLog && preview.rollbackRisk === 'safe' && !isRollingBack);
 
@@ -214,12 +248,30 @@ export function AdminSeoRepairAudit() {
     setNotice('Seçili log CSV olarak indirildi.');
   }
 
+  function exportRollbackCsv() {
+    if (!selectedLog || !preview.rollbackResults.length) {
+      setError('Rollback CSV için önce geri alma sonucu olan bir log seç.');
+      return;
+    }
+    downloadText(`seo-rollback-${selectedLog.id}.csv`, buildRollbackCsv(selectedLog, preview.rollbackResults), 'text/csv;charset=utf-8');
+    setNotice('Rollback sonucu CSV olarak indirildi.');
+  }
+
   function exportSelectedJson() {
     if (!selectedLog) {
       setError('JSON dışa aktarma için önce bir log seç.');
       return;
     }
-    downloadText(`seo-audit-${selectedLog.id}.json`, JSON.stringify(selectedLog, null, 2), 'application/json;charset=utf-8');
+    const payload = {
+      ...selectedLog,
+      auditExport: {
+        rollbackSummary: preview.rollbackSummary,
+        restoredCount: preview.restoredResults.length,
+        skippedRollbackCount: preview.skippedRollbackResults.length,
+        generatedAt: new Date().toISOString()
+      }
+    };
+    downloadText(`seo-audit-${selectedLog.id}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
     setNotice('Seçili log JSON olarak indirildi.');
   }
 
@@ -231,7 +283,17 @@ export function AdminSeoRepairAudit() {
       repairedCount: log.repairedCount,
       skippedCount: log.skippedCount,
       changedFieldCount: log.changedFieldCount,
-      changedFieldSummary: log.changedFieldSummary || {}
+      changedFieldSummary: log.changedFieldSummary || {},
+      rollback: {
+        rolledBackAt: log.rolledBackAt || null,
+        available: Boolean(log.rollbackAvailable),
+        resultCount: (log.rollbackResults || []).length,
+        summary: (log.rollbackResults || []).reduce((acc, item) => {
+          const key = item.status || 'unknown';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})
+      }
     }));
     downloadText('seo-audit-filtered-summary.json', JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
     setNotice('Filtrelenmiş log özeti JSON olarak indirildi.');
@@ -293,10 +355,13 @@ export function AdminSeoRepairAudit() {
           <label>Arama<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Log ID, tarih veya alan ara" /></label>
           <label>Durum<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tümü</option><option value="ready">Hazır</option><option value="done">Geri alınmış</option><option value="legacy">Eski / verisiz</option></select></label>
           <label>Alan<select value={fieldFilter} onChange={(event) => setFieldFilter(event.target.value)}><option value="all">Tüm alanlar</option>{fields.map((field) => <option value={field} key={field}>{FIELD_LABELS[field] || field}</option>)}</select></label>
-          <button type="button" onClick={() => { setQuery(''); setStatusFilter('all'); setFieldFilter('all'); }}>Temizle</button>
+          <label>Tarih başlangıcı<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+          <label>Tarih bitişi<input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
+          <button type="button" onClick={() => { setQuery(''); setStatusFilter('all'); setFieldFilter('all'); setStartDate(''); setEndDate(''); }}>Temizle</button>
           <button type="button" onClick={() => loadLogs().catch((err) => setError(err.message))}>Yenile</button>
           <button type="button" onClick={exportVisibleSummary}>Görünen özeti indir</button>
         </div>
+        {activeDateRange && <p className="notice compact-date-note">Tarih filtresi aktif: {startDate || 'ilk kayıt'} → {endDate || 'bugün/son kayıt'}</p>}
       </div>
 
       {notice && <p className="success">{notice}</p>}
@@ -391,6 +456,7 @@ export function AdminSeoRepairAudit() {
               <div className="seo-audit-export-actions">
                 <button type="button" onClick={exportSelectedCsv}>CSV indir</button>
                 <button type="button" onClick={exportSelectedJson}>JSON indir</button>
+                <button type="button" onClick={exportRollbackCsv}>Rollback CSV indir</button>
                 <button type="button" onClick={copySelectedSummary}>Özeti kopyala</button>
               </div>
 

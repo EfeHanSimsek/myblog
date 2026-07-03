@@ -20,6 +20,22 @@
   min-width: 210px;
 }
 
+.seo-audit-toolbar input[type="date"] {
+  min-height: 42px;
+}
+
+.seo-audit-toolbar button {
+  min-height: 42px;
+}
+
+.compact-date-note {
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+}
+
 .seo-audit-layout {
   display: grid;
   gap: 1rem;
@@ -75,8 +91,24 @@
 
 .seo-audit-export-actions {
   align-items: center;
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
-  padding-top: 0.75rem;
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  padding: 0.85rem;
+}
+
+.seo-audit-export-actions::before {
+  color: var(--muted);
+  content: 'Dışa aktarma';
+  flex-basis: 100%;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.seo-audit-export-actions button {
+  min-height: 40px;
 }
 
 .seo-audit-preview-grid {
@@ -245,6 +277,19 @@
   .seo-audit-layout,
   .seo-audit-result-columns {
     grid-template-columns: 1fr;
+  }
+
+  .seo-audit-toolbar,
+  .seo-audit-export-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .seo-audit-toolbar label,
+  .seo-audit-toolbar button,
+  .seo-audit-export-actions button {
+    min-width: 0;
+    width: 100%;
   }
 
   .seo-audit-rollback-panel {

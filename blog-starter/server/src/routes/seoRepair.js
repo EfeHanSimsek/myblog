@@ -110,6 +110,25 @@ function restoreValues(values = {}) {
   }, {});
 }
 
+function summarizeLog(log) {
+  const repairedItems = Array.isArray(log.results) ? log.results.filter((item) => item.status === 'repaired') : [];
+  const skippedItems = Array.isArray(log.results) ? log.results.filter((item) => item.status === 'skipped') : [];
+  const changedFieldSummary = repairedItems.reduce((acc, item) => {
+    (item.changedFields || []).forEach((field) => {
+      acc[field] = (acc[field] || 0) + 1;
+    });
+    return acc;
+  }, {});
+
+  return {
+    ...log,
+    rollbackAvailable: hasRollbackData(log),
+    repairedItemCount: repairedItems.length,
+    skippedItemCount: skippedItems.length,
+    changedFieldSummary
+  };
+}
+
 router.post('/batch-repair', requireAuth, requirePublisher, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(String).filter(Boolean))] : [];
   if (!ids.length) return fail(res, 400, 'Toplu onarım için en az bir yazı seç');
@@ -184,7 +203,7 @@ router.post('/batch-repair', requireAuth, requirePublisher, async (req, res) => 
   db.seoRepairLogs = db.seoRepairLogs.slice(0, 50);
 
   await writeDb(db);
-  return ok(res, { report: log }, `${repairedCount} yazı için geri alınabilir toplu SEO onarım tamamlandı`);
+  return ok(res, { report: summarizeLog(log) }, `${repairedCount} yazı için geri alınabilir toplu SEO onarım tamamlandı`);
 });
 
 router.get('/logs', requireAuth, requirePublisher, async (req, res) => {
@@ -193,12 +212,17 @@ router.get('/logs', requireAuth, requirePublisher, async (req, res) => {
     .slice()
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 25)
-    .map((log) => ({
-      ...log,
-      rollbackAvailable: hasRollbackData(log)
-    }));
+    .map(summarizeLog);
 
   return ok(res, { logs });
+});
+
+router.get('/logs/:id', requireAuth, requirePublisher, async (req, res) => {
+  const db = normalizeDb(await readDb());
+  const log = db.seoRepairLogs.find((item) => item.id === req.params.id);
+  if (!log) return fail(res, 404, 'SEO işlem logu bulunamadı');
+
+  return ok(res, { log: summarizeLog(log) });
 });
 
 router.post('/logs/:id/rollback', requireAuth, requirePublisher, async (req, res) => {

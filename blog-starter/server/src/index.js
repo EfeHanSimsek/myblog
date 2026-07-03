@@ -126,6 +126,7 @@ app.get('/rss.xml', async (req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/posts/seo', seoRepairRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/seo-repair', seoRepairRoutes);
 app.use('/api/media', mediaRoutes);

@@ -1,0 +1,96 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../lib/api';
+import './AdminSeoRepairAudit.css';
+
+const FIELD_LABELS = {
+  slug: 'Slug', summary: 'Özet', seoTitle: 'SEO başlığı', seoDescription: 'SEO açıklaması', altCoverImage: 'Kapak alt metni', tags: 'Etiketler'
+};
+
+function formatDate(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function formatValue(value) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+  return String(value || '').trim() || '—';
+}
+
+function statusOf(log) {
+  if (log.rolledBackAt) return { key: 'done', label: 'Geri alınmış', className: 'locked' };
+  if (log.rollbackAvailable) return { key: 'ready', label: 'Hazır', className: 'ready' };
+  return { key: 'legacy', label: 'Eski / verisiz', className: 'locked' };
+}
+
+function previewFrom(log) {
+  const rows = (log?.results || []).filter((item) => item.status === 'repaired' && item.previousValues);
+  const fieldTotals = rows.reduce((acc, item) => {
+    (item.changedFields || []).forEach((field) => { acc[field] = (acc[field] || 0) + 1; });
+    return acc;
+  }, {});
+  return { rows, fieldTotals };
+}
+
+export function AdminSeoRepairAudit() {
+  const [logs, setLogs] = useState([]);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [fieldFilter, setFieldFilter] = useState('all');
+  const [selectedLogId, setSelectedLogId] = useState('');
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [error, setError] = useState('');
+
+  async function loadLogs() {
+    setError('');
+    const data = await api('/seo-repair/logs');
+    setLogs(data.logs || []);
+  }
+
+  useEffect(() => { loadLogs().catch((err) => setError(err.message)); }, []);
+
+  const fields = useMemo(() => {
+    const found = new Set();
+    logs.forEach((log) => Object.keys(log.changedFieldSummary || {}).forEach((field) => found.add(field)));
+    return [...found].sort((a, b) => (FIELD_LABELS[a] || a).localeCompare(FIELD_LABELS[b] || b, 'tr'));
+  }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr-TR');
+    return logs.filter((log) => {
+      const state = statusOf(log).key;
+      const fieldText = Object.keys(log.changedFieldSummary || {}).map((field) => FIELD_LABELS[field] || field).join(' ');
+      const text = [log.id, log.createdAt, fieldText].join(' ').toLocaleLowerCase('tr-TR');
+      return (statusFilter === 'all' || statusFilter === state) && (fieldFilter === 'all' || Boolean(log.changedFieldSummary?.[fieldFilter])) && (!q || text.includes(q));
+    });
+  }, [fieldFilter, logs, query, statusFilter]);
+
+  const totals = useMemo(() => ({
+    ready: logs.filter((log) => statusOf(log).key === 'ready').length,
+    done: logs.filter((log) => statusOf(log).key === 'done').length,
+    legacy: logs.filter((log) => statusOf(log).key === 'legacy').length,
+    visible: filteredLogs.length,
+    total: logs.length
+  }), [filteredLogs, logs]);
+
+  const preview = useMemo(() => previewFrom(selectedLog), [selectedLog]);
+
+  async function openLog(log) {
+    if (selectedLogId === log.id && selectedLog) { setSelectedLogId(''); setSelectedLog(null); return; }
+    setSelectedLogId(log.id);
+    try {
+      const data = await api(`/seo-repair/logs/${log.id}`);
+      setSelectedLog(data.log || null);
+    } catch (err) { setError(err.message); }
+  }
+
+  return (
+    <section className="page stack seo-audit-page">
+      <div className="section-heading"><div><p className="eyebrow">SEO işlem denetimi</p><h1>Log arama, filtreleme ve güvenli önizleme</h1></div><div className="actions compact-actions"><Link className="row-action" to="/dashboard/batch-seo-repair">Toplu SEO</Link><Link className="row-action" to="/dashboard/seo-guard">SEO Onarım</Link><Link className="row-action" to="/dashboard">Editör</Link></div></div>
+      <div className="stats seo-audit-stats"><div><strong>{totals.ready}</strong><span>Hazır log</span></div><div><strong>{totals.done}</strong><span>Geri alınmış</span></div><div><strong>{totals.legacy}</strong><span>Eski/verisiz</span></div><div><strong>{totals.visible}</strong><span>Filtre sonucu</span></div><div><strong>{totals.total}</strong><span>Toplam log</span></div></div>
+      <div className="panel seo-audit-filter-panel"><div><p className="eyebrow">Kontrollü denetim</p><h2>Logları daralt ve etkiyi incele</h2><p className="notice">Bu sayfa sadece okuma ve önizleme yapar; yazı içeriği, yayın durumu veya SEO alanlarını değiştirmez.</p></div><div className="seo-audit-toolbar"><label>Arama<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Log ID, tarih veya alan ara" /></label><label>Durum<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tümü</option><option value="ready">Hazır</option><option value="done">Geri alınmış</option><option value="legacy">Eski / verisiz</option></select></label><label>Alan<select value={fieldFilter} onChange={(event) => setFieldFilter(event.target.value)}><option value="all">Tüm alanlar</option>{fields.map((field) => <option value={field} key={field}>{FIELD_LABELS[field] || field}</option>)}</select></label><button type="button" onClick={() => { setQuery(''); setStatusFilter('all'); setFieldFilter('all'); }}>Temizle</button><button type="button" onClick={() => loadLogs().catch((err) => setError(err.message))}>Yenile</button></div></div>
+      {error && <p className="error">{error}</p>}
+      <div className="seo-audit-layout"><div className="panel seo-audit-log-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">İşlem geçmişi</p><h2>Filtrelenmiş loglar</h2></div></div><div className="seo-audit-log-list">{filteredLogs.map((log) => { const state = statusOf(log); return <button className={`seo-audit-log-row ${selectedLogId === log.id ? 'active' : ''}`} type="button" onClick={() => openLog(log)} key={log.id}><strong>{formatDate(log.createdAt)}</strong><span>{log.repairedCount} onarıldı · {log.skippedCount} atlandı · {log.changedFieldCount} alan değişti</span><em className={`batch-rollback-note ${state.className}`}>{state.label}</em></button>; })}{!filteredLogs.length && <p className="notice">Bu filtrelerle eşleşen log yok.</p>}</div></div><div className="panel seo-audit-preview-panel"><div className="section-heading compact-heading"><div><p className="eyebrow">Önizleme</p><h2>{selectedLog ? `${formatDate(selectedLog.createdAt)} işlem etkisi` : 'Log seç'}</h2></div></div>{!selectedLog && <p className="notice">Sol listeden bir log seçince eski/yeni SEO değerleri burada görünür.</p>}{selectedLog && <><div className="batch-report-grid seo-audit-preview-grid"><div><strong>{preview.rows.length}</strong><span>Etkilenen yazı</span></div><div><strong>{Object.values(preview.fieldTotals).reduce((a, b) => a + b, 0)}</strong><span>Alan değişimi</span></div><div><strong>{selectedLog.skippedCount}</strong><span>Atlanan</span></div><div><strong>{selectedLog.rollbackResults?.length || 0}</strong><span>Geri alma sonucu</span></div></div><div className="seo-audit-field-summary">{Object.entries(preview.fieldTotals).map(([field, count]) => <span className="seo-state-pill neutral" key={field}>{FIELD_LABELS[field] || field}: {count}</span>)}</div><div className="seo-audit-diff-list">{preview.rows.slice(0, 10).map((item) => <article className="batch-diff-card" key={`${selectedLog.id}-${item.id}`}><div className="batch-diff-card-head"><div><strong>{item.title || item.id}</strong><span>{(item.changedFields || []).length} alan işlem kapsamında</span></div><Link className="row-action" to={`/dashboard?edit=${item.id}&focus=seo`}>Editörde aç</Link></div><div className="batch-diff-table">{(item.changedFields || []).map((field) => <div className="batch-diff-row" key={`${item.id}-${field}`}><strong>{FIELD_LABELS[field] || field}</strong><div><span>Eski değer</span><p>{formatValue(item.previousValues?.[field])}</p></div><div><span>Yeni değer</span><p>{formatValue(item.nextValues?.[field])}</p></div></div>)}</div></article>)}</div></>}</div></div>
+    </section>
+  );
+}

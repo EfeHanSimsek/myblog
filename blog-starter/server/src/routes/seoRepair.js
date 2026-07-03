@@ -129,6 +129,42 @@ function summarizeLog(log) {
   };
 }
 
+function statusKey(log) {
+  if (log?.rolledBackAt) return 'done';
+  if (hasRollbackData(log)) return 'ready';
+  return 'legacy';
+}
+
+function parseDateBound(value, endOfDay = false) {
+  if (!value) return null;
+  const suffix = endOfDay ? 'T23:59:59.999' : 'T00:00:00.000';
+  const date = new Date(`${value}${String(value).includes('T') ? '' : suffix}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function filterLogs(logs, query = {}) {
+  const search = String(query.q || query.search || '').trim().toLocaleLowerCase('tr-TR');
+  const status = String(query.status || 'all');
+  const field = String(query.field || 'all');
+  const start = parseDateBound(query.startDate || query.from);
+  const end = parseDateBound(query.endDate || query.to, true);
+
+  return logs.filter((log) => {
+    const summary = summarizeLog(log);
+    const createdAt = log.createdAt ? new Date(log.createdAt) : null;
+    const createdTime = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : null;
+    const fieldText = Object.keys(summary.changedFieldSummary || {}).join(' ');
+    const titleText = (log.results || []).map((item) => item.title || item.id || '').join(' ');
+    const haystack = [log.id, log.createdAt, fieldText, titleText].join(' ').toLocaleLowerCase('tr-TR');
+
+    return (status === 'all' || statusKey(log) === status)
+      && (field === 'all' || Boolean(summary.changedFieldSummary?.[field]))
+      && (!start || (createdTime && createdTime >= start.getTime()))
+      && (!end || (createdTime && createdTime <= end.getTime()))
+      && (!search || haystack.includes(search));
+  });
+}
+
 router.post('/batch-repair', requireAuth, requirePublisher, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(String).filter(Boolean))] : [];
   if (!ids.length) return fail(res, 400, 'Toplu onarım için en az bir yazı seç');
@@ -208,13 +244,13 @@ router.post('/batch-repair', requireAuth, requirePublisher, async (req, res) => 
 
 router.get('/logs', requireAuth, requirePublisher, async (req, res) => {
   const db = normalizeDb(await readDb());
-  const logs = db.seoRepairLogs
+  const limit = Math.min(Math.max(Number(req.query.limit || 25), 1), 50);
+  const filtered = filterLogs(db.seoRepairLogs, req.query)
     .slice()
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 25)
-    .map(summarizeLog);
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const logs = filtered.slice(0, limit).map(summarizeLog);
 
-  return ok(res, { logs });
+  return ok(res, { logs, total: filtered.length, limit });
 });
 
 router.get('/logs/:id', requireAuth, requirePublisher, async (req, res) => {

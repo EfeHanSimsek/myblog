@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import './AdminBatchSeoRepair.css';
 
+const FIELD_LABELS = {
+  slug: 'Slug',
+  summary: 'Özet',
+  seoTitle: 'SEO başlığı',
+  seoDescription: 'SEO açıklaması',
+  altCoverImage: 'Kapak alt metni',
+  tags: 'Etiketler'
+};
+
 function createSlug(value) {
   return String(value || '')
     .toLocaleLowerCase('tr-TR')
@@ -110,12 +119,35 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatFieldValue(value) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+  return String(value || '').trim() || '—';
+}
+
+function getLogFieldRows(log) {
+  return Object.entries(log?.changedFieldSummary || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([field, count]) => ({ field, count, label: FIELD_LABELS[field] || field }));
+}
+
+function getLogDiffRows(item) {
+  return (item.changedFields || []).map((field) => ({
+    field,
+    label: FIELD_LABELS[field] || field,
+    before: formatFieldValue(item.previousValues?.[field]),
+    after: formatFieldValue(item.nextValues?.[field])
+  }));
+}
+
 export function AdminBatchSeoRepair() {
   const [posts, setPosts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [filter, setFilter] = useState('fixable');
   const [isApplying, setIsApplying] = useState(false);
   const [rollbackId, setRollbackId] = useState('');
+  const [detailLogId, setDetailLogId] = useState('');
+  const [detailLog, setDetailLog] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [lastReport, setLastReport] = useState(null);
@@ -195,6 +227,8 @@ export function AdminBatchSeoRepair() {
         body: JSON.stringify({ ids: selectedPlans.map((plan) => plan.post.id) })
       });
       setLastReport(data.report || null);
+      setDetailLog(data.report || null);
+      setDetailLogId(data.report?.id || '');
       setMessage(`${data.report?.repairedCount || 0} yazı backend batch endpoint ile onarıldı. ${data.report?.skippedCount || 0} yazı atlandı.`);
       setSelectedIds([]);
       await load();
@@ -202,6 +236,30 @@ export function AdminBatchSeoRepair() {
       setError(err.message);
     } finally {
       setIsApplying(false);
+    }
+  }
+
+  async function loadLogDetail(log) {
+    const nextId = log?.id;
+    if (!nextId) return;
+    if (detailLogId === nextId && detailLog) {
+      setDetailLogId('');
+      setDetailLog(null);
+      return;
+    }
+
+    setIsDetailLoading(true);
+    setError('');
+    setDetailLogId(nextId);
+
+    try {
+      const data = await api(`/seo-repair/logs/${nextId}`);
+      setDetailLog(data.log || null);
+    } catch (err) {
+      setError(err.message);
+      setDetailLog(null);
+    } finally {
+      setIsDetailLoading(false);
     }
   }
 
@@ -218,6 +276,8 @@ export function AdminBatchSeoRepair() {
     try {
       const data = await api(`/seo-repair/logs/${log.id}/rollback`, { method: 'POST' });
       setMessage(`${data.report?.restoredCount || 0} yazı geri alındı. ${data.report?.skippedCount || 0} yazı atlandı.`);
+      setDetailLog(null);
+      setDetailLogId('');
       await load();
     } catch (err) {
       setError(err.message);
@@ -225,6 +285,8 @@ export function AdminBatchSeoRepair() {
       setRollbackId('');
     }
   }
+
+  const detailFieldRows = getLogFieldRows(detailLog);
 
   return (
     <section className="page stack batch-seo-page">
@@ -252,7 +314,7 @@ export function AdminBatchSeoRepair() {
         <div>
           <p className="eyebrow">Güvenli backend işlem</p>
           <h2>Durum değiştirmeden metadata önerisi uygula</h2>
-          <p className="notice">Bu işlem yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez ve her işlem için rapor/log üretir. Yeni loglar geri alma uygunluğu göstergesiyle listelenir.</p>
+          <p className="notice">Bu işlem yazıyı yayına almaz, taslağı yayınlamaz, içerik metnini otomatik genişletmez ve her işlem için rapor/log üretir. Yeni loglar eski/yeni değer karşılaştırmasıyla geri alınabilir.</p>
         </div>
         <div className="batch-seo-toolbar">
           <label>Filtre
@@ -294,8 +356,67 @@ export function AdminBatchSeoRepair() {
             {(lastReport.results || []).slice(0, 8).map((item) => (
               <div className="batch-log-row" key={item.id}>
                 <strong>{item.title || item.id}</strong>
-                <span>{item.status === 'repaired' ? `Değişen: ${item.changedFields.join(', ')}` : item.reason}</span>
+                <span>{item.status === 'repaired' ? `Değişen: ${(item.changedFields || []).join(', ')}` : item.reason}</span>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {detailLog && (
+        <div className="panel batch-detail-panel">
+          <div className="section-heading compact-heading">
+            <div>
+              <p className="eyebrow">Rollback detay ekranı</p>
+              <h2>{formatDate(detailLog.createdAt)} işlem karşılaştırması</h2>
+            </div>
+            <span className={`batch-rollback-note ${detailLog.rollbackAvailable ? 'ready' : 'locked'}`}>
+              {detailLog.rolledBackAt ? `Geri alınmış: ${formatDate(detailLog.rolledBackAt)}` : detailLog.rollbackAvailable ? 'Geri alınabilir' : 'Geri alınamaz'}
+            </span>
+          </div>
+
+          <div className="batch-report-grid">
+            <div><strong>{detailLog.repairedCount}</strong><span>Onarılan yazı</span></div>
+            <div><strong>{detailLog.skippedCount}</strong><span>Atlanan yazı</span></div>
+            <div><strong>{detailLog.changedFieldCount}</strong><span>Toplam alan değişimi</span></div>
+            <div><strong>{detailLog.rollbackResults?.length || 0}</strong><span>Rollback sonucu</span></div>
+          </div>
+
+          <div className="batch-field-summary">
+            {detailFieldRows.length ? detailFieldRows.map((row) => (
+              <span className="seo-state-pill neutral" key={row.field}>{row.label}: {row.count}</span>
+            )) : <p className="notice">Bu logda alan değişimi detayı yok.</p>}
+          </div>
+
+          <div className="batch-diff-list">
+            {(detailLog.results || []).map((item) => (
+              <article className="batch-diff-card" key={`${detailLog.id}-${item.id}`}>
+                <div className="batch-diff-card-head">
+                  <div>
+                    <strong>{item.title || item.id}</strong>
+                    <span>{item.status === 'repaired' ? `${(item.changedFields || []).length} alan değişti` : item.reason}</span>
+                  </div>
+                  <Link className="row-action" to={`/dashboard?edit=${item.id}&focus=seo`}>Editörde aç</Link>
+                </div>
+
+                {item.status === 'repaired' ? (
+                  <div className="batch-diff-table">
+                    {getLogDiffRows(item).map((row) => (
+                      <div className="batch-diff-row" key={`${item.id}-${row.field}`}>
+                        <strong>{row.label}</strong>
+                        <div><span>Eski</span><p>{row.before}</p></div>
+                        <div><span>Yeni</span><p>{row.after}</p></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="notice">Bu yazıda otomatik değişiklik yapılmadı.</p>
+                )}
+
+                {item.remainingManual?.length > 0 && (
+                  <p className="notice">Manuel kalanlar: {item.remainingManual.join(', ')}</p>
+                )}
+              </article>
             ))}
           </div>
         </div>
@@ -362,6 +483,9 @@ export function AdminBatchSeoRepair() {
                 <span className={`batch-rollback-note ${log.rollbackAvailable ? 'ready' : 'locked'}`}>
                   {log.rolledBackAt ? `Geri alındı: ${formatDate(log.rolledBackAt)}` : log.rollbackAvailable ? 'Geri alma hazır' : 'Eski log / geri alma verisi yok'}
                 </span>
+                <button type="button" onClick={() => loadLogDetail(log)} disabled={isDetailLoading && detailLogId === log.id}>
+                  {isDetailLoading && detailLogId === log.id ? 'Detay yükleniyor...' : detailLogId === log.id ? 'Detayı kapat' : 'Detay'}
+                </button>
                 <button type="button" disabled={!log.rollbackAvailable || rollbackId === log.id} onClick={() => rollbackLog(log)}>
                   {rollbackId === log.id ? 'Geri alınıyor...' : 'Geri al'}
                 </button>

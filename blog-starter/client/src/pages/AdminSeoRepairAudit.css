@@ -117,9 +117,56 @@
   border-color: rgba(245, 158, 11, 0.24);
 }
 
+.seo-audit-rollback-panel {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+}
+
+.seo-audit-rollback-panel div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.seo-audit-rollback-panel span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.danger-action {
+  background: rgba(220, 38, 38, 0.92);
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  white-space: nowrap;
+}
+
+.danger-action:disabled {
+  background: rgba(148, 163, 184, 0.65);
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .seo-audit-stats,
   .seo-audit-layout {
     grid-template-columns: 1fr;
+  }
+
+  .seo-audit-rollback-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .danger-action {
+    width: 100%;
   }
 }

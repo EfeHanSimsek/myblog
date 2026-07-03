@@ -1,0 +1,83 @@
+.seo-audit-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.seo-audit-filter-panel,
+.seo-audit-log-panel,
+.seo-audit-preview-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.seo-audit-toolbar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.seo-audit-toolbar label {
+  min-width: 210px;
+}
+
+.seo-audit-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.seo-audit-log-list,
+.seo-audit-diff-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.seo-audit-log-row {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  text-align: left;
+}
+
+.seo-audit-log-row.active,
+.seo-audit-log-row:hover {
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.seo-audit-log-row strong,
+.seo-audit-log-row span,
+.seo-audit-log-row em {
+  display: block;
+}
+
+.seo-audit-log-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.seo-audit-log-row em {
+  font-style: normal;
+  margin-top: 0.25rem;
+}
+
+.seo-audit-field-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.seo-audit-preview-grid {
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .seo-audit-stats,
+  .seo-audit-layout {
+    grid-template-columns: 1fr;
+  }
+}

@@ -159,6 +159,16 @@ const quickActions = [
     detail: 'Kritik kayıt eksiklerini gör'
   },
   {
+    href: '/dashboard/batch-seo-repair',
+    label: 'Toplu SEO',
+    detail: 'Seçili yazılara batch öneri uygula'
+  },
+  {
+    href: '/dashboard/seo-repair-audit',
+    label: 'SEO audit',
+    detail: 'Batch log, dışa aktarım ve rollback denetimi'
+  },
+  {
     href: '/dashboard/calendar',
     label: 'Takvim',
     detail: 'Yayın planını gör'
@@ -182,7 +192,8 @@ const safetyWorkflow = [
   'Önce yayındaki kritik SEO kayıtlarını kapat.',
   'Sonra hazır taslakları takvim tarihine göre sırala.',
   'Eksik medya ve kısa içerik kuyruğunu toplu düzelt.',
-  'Yayına almadan önce son kez SEO Onarım filtresini kontrol et.'
+  'Yayına almadan önce son kez SEO Onarım filtresini kontrol et.',
+  'Toplu SEO işleminden sonra Audit ekranında log ve rollback durumunu denetle.'
 ];
 
 function scrollToDashboardSection(event, selector) {
@@ -321,8 +332,24 @@ export function DashboardOverview({ posts }) {
 
       <article className="panel overview-card batch-repair-card">
         <div className="section-heading">
-          <div><p className="eyebrow">Toplu Onarım Paketleri</p><h2>En düşük skorlar</h2></div>
-          <a className="row-action" href="/dashboard/quality">Kaliteye git</a>
+          <div><p className="eyebrow">Toplu Onarım Merkezi</p><h2>Batch SEO ve audit</h2></div>
+          <a className="row-action" href="/dashboard/batch-seo-repair">Toplu SEO</a>
+        </div>
+        <div className="quality-summary">
+          <div><strong>{overview.seoQueue.length}</strong><span>Batch adayı</span></div>
+          <div><strong>{overview.publishedBlockers.length}</strong><span>Yayında kritik</span></div>
+          <div><strong>{overview.lowScorePosts.length}</strong><span>70 altı skor</span></div>
+        </div>
+        <div className="quick-actions-grid mini-tool-grid">
+          <a className="button-link quick-action-link" href="/dashboard/batch-seo-repair"><strong>Batch uygula</strong><span>Seçili yazılara güvenli metadata önerisi uygula</span></a>
+          <a className="button-link quick-action-link" href="/dashboard/seo-repair-audit"><strong>Audit aç</strong><span>Logları filtrele, dışa aktar ve rollback önizle</span></a>
+        </div>
+      </article>
+
+      <article className="panel overview-card batch-repair-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Düşük Skorlar</p><h2>İlk düzeltilecekler</h2></div>
+          <a className="row-action" href="/dashboard/batch-seo-repair">Batch seç</a>
         </div>
         {topLowScorePosts.length ? (
           <div className="priority-list compact-priority-list">
@@ -362,7 +389,7 @@ export function DashboardOverview({ posts }) {
       <article className="panel overview-card workflow-card">
         <div className="section-heading">
           <div><p className="eyebrow">Yayın Akışı</p><h2>Güvenli sıra</h2></div>
-          <a className="row-action" href="/dashboard/calendar">Takvim</a>
+          <a className="row-action" href="/dashboard/seo-repair-audit">Audit</a>
         </div>
         <ol className="publishing-checklist compact-checklist">
           {safetyWorkflow.map((item) => <li key={item}>{item}</li>)}

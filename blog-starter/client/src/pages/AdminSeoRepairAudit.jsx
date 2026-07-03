@@ -146,7 +146,7 @@ export function AdminSeoRepairAudit() {
       const data = await api(`/seo-repair/logs/${selectedLog.id}/rollback`, { method: 'POST' });
       await loadLogs();
       await loadLogDetail(selectedLog.id);
-      const restored = data.rollbackResults?.filter((item) => item.status === 'rolled_back').length || 0;
+      const restored = data.report?.restoredCount || data.rollbackResults?.filter((item) => item.status === 'restored').length || 0;
       setNotice(`Rollback tamamlandı. Geri alınan yazı: ${restored}`);
     } catch (err) {
       setError(err.message);
